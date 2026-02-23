@@ -15,11 +15,8 @@ namespace Downloader.Service
         private readonly IOptions<DownloaderSettings> options;
 
         public OrchestratorService(
-            ILogger<OrchestratorService> logger,
-            IFileService fileService,
-            IDownloadService downloadService,
-            IReportService reportService,
-            IOptions<DownloaderSettings> options)
+            ILogger<OrchestratorService> logger, IFileService fileService, IDownloadService downloadService,
+            IReportService reportService, IOptions<DownloaderSettings> options)
         {
             this.logger = logger;
             this.fileService = fileService;
@@ -33,30 +30,136 @@ namespace Downloader.Service
         {
             logger.LogInformation("Workflow started.");
 
-            var targets = await LoadTargets();
-            if (targets.Count == 0)
+            var (validTargets, invalidTargets) = await LoadTargets();
+            TargetCounts counts = GetCounts(validTargets, invalidTargets);
+
+            if (ShouldExitWithoutReport(counts))
             {
-                logger.LogInformation("Workflow completed with no targets and no report.");
+                LogExitWithoutReport();
                 return;
             }
 
-            var results = await DownloadAllWithConcurrencyLimit(targets, options.Value.MaxConcurrentDownloads);
+            if (ShouldGenerateInvalidOnlyReport(counts))
+            {
+                await GenerateAndExportInvalidOnlyReport(invalidTargets, counts);
+                return;
+            }
 
-            var report = reportService.GenerateReport(results);
-            await fileService.ExportReport(report);
+            var downloadedTargets = await DownloadValidTargets(validTargets);
+            var targetsForReport = MergeForReport(downloadedTargets, invalidTargets);
 
-            logger.LogInformation("Workflow completed. Downloads: {Count}", results.Count);
+            await GenerateAndExportReport(targetsForReport);
+
+            LogCompleted(downloadedTargets.Count, invalidTargets.Count, targetsForReport.Count);
         }
 
-        private async Task<IList<IDownloadTarget>> LoadTargets()
+        private sealed record TargetCounts(int Valid, int Invalid)
+        {
+            public int Total => Valid + Invalid;
+        }
+
+        private TargetCounts GetCounts(IList<IDownloadTarget> valid, IList<IDownloadTarget> invalid)
+        {
+            return new TargetCounts(valid.Count, invalid.Count);
+        }
+
+        private bool ShouldExitWithoutReport(TargetCounts counts)
+        {
+            return counts.Total == 0;
+        }
+
+        private bool ShouldGenerateInvalidOnlyReport(TargetCounts counts)
+        {
+            return counts.Valid == 0 && counts.Invalid > 0;
+        }
+
+        private void LogExitWithoutReport()
+        {
+            logger.LogInformation("Workflow completed with no targets and no report.");
+        }
+
+        private async Task GenerateAndExportInvalidOnlyReport(
+            IList<IDownloadTarget> invalidTargets, TargetCounts counts)
+        {
+            logger.LogWarning(
+                "Workflow completed with no valid targets to download. Generating report for {InvalidCount} invalid targets.",
+                counts.Invalid);
+
+            await GenerateAndExportReport(invalidTargets);
+
+            logger.LogInformation("Workflow completed. Downloaded: 0, Invalid: {InvalidCount}", counts.Invalid);
+        }
+
+        private Task<IList<IDownloadTarget>> DownloadValidTargets(IList<IDownloadTarget> validTargets)
+        {
+            return DownloadAllWithConcurrencyLimit(validTargets, options.Value.MaxConcurrentDownloads);
+        }
+
+        private IList<IDownloadTarget> MergeForReport(
+            IList<IDownloadTarget> downloadedTargets, IList<IDownloadTarget> invalidTargets)
+        {
+            var merged = new List<IDownloadTarget>(downloadedTargets.Count + invalidTargets.Count);
+            merged.AddRange(downloadedTargets);
+            merged.AddRange(invalidTargets);
+
+            merged.Sort((a, b) =>
+                string.Compare(a.OutputFileName, b.OutputFileName, StringComparison.OrdinalIgnoreCase));
+
+            return merged;
+        }
+
+        private async Task GenerateAndExportReport(IList<IDownloadTarget> targetsForReport)
+        {
+            string report = reportService.GenerateReport(targetsForReport);
+            await fileService.ExportReport(report);
+        }
+
+        private void LogCompleted(int downloadedCount, int invalidCount, int totalCount)
+        {
+            logger.LogInformation(
+                "Workflow completed. Downloaded: {DownloadedCount}, Invalid: {InvalidCount}, Total: {TotalCount}",
+                downloadedCount, invalidCount, totalCount);
+        }
+
+        private async Task<(IList<IDownloadTarget> validTargets, IList<IDownloadTarget> invalidTargets)> LoadTargets()
         {
             var targets = await fileService.LoadTargetsFromInput();
-            return targets ?? throw new InvalidOperationException("LoadTargetsFromInput returned null.");
+            return SplitTargetsOnLinkExistence(targets);
+        }
+
+        private (IList<IDownloadTarget> validTargets, IList<IDownloadTarget> invalidTargets)
+            SplitTargetsOnLinkExistence(IList<IDownloadTarget> targets)
+        {
+            if (targets.Count == 0)
+                return (targets, targets);
+
+            var filtered = new List<IDownloadTarget>(targets.Count);
+            var removed = new List<IDownloadTarget>(targets.Count);
+
+            foreach (IDownloadTarget target in targets)
+            {
+                if (HasAnyLink(target))
+                {
+                    filtered.Add(target);
+                    continue;
+                }
+
+                removed.Add(target);
+                logger.LogWarning(
+                    "Removing target '{OutputFileName}' because neither {PrimaryLink} nor {SecondaryLink} is set.",
+                    target.OutputFileName, nameof(IDownloadTarget.PrimaryLink), nameof(IDownloadTarget.SecondaryLink));
+            }
+
+            return (filtered, removed);
+        }
+
+        private bool HasAnyLink(IDownloadTarget target)
+        {
+            return !string.IsNullOrWhiteSpace(target.PrimaryLink) || !string.IsNullOrWhiteSpace(target.SecondaryLink);
         }
 
         private async Task<IList<IDownloadTarget>> DownloadAllWithConcurrencyLimit(
-            IList<IDownloadTarget> targets,
-            int maxConcurrentDownloads)
+            IList<IDownloadTarget> targets, int maxConcurrentDownloads)
         {
             var workQueue = BuildWorkQueue(targets);
             return await RunQueueWithLimit(workQueue, maxConcurrentDownloads);
@@ -66,9 +169,9 @@ namespace Downloader.Service
         {
             var queue = new Queue<Func<Task<IDownloadTarget>>>(targets.Count);
 
-            foreach (var target in targets)
+            foreach (IDownloadTarget target in targets)
             {
-                var captured = target;
+                IDownloadTarget captured = target;
                 queue.Enqueue(() => downloadService.DownloadContent(captured));
             }
 
@@ -76,8 +179,7 @@ namespace Downloader.Service
         }
 
         private async Task<IList<IDownloadTarget>> RunQueueWithLimit(
-            Queue<Func<Task<IDownloadTarget>>> queue,
-            int maxConcurrent)
+            Queue<Func<Task<IDownloadTarget>>> queue, int maxConcurrent)
         {
             var active = new List<Task<IDownloadTarget>>(Math.Min(maxConcurrent, queue.Count));
             var completed = new List<IDownloadTarget>();
@@ -99,24 +201,16 @@ namespace Downloader.Service
         }
 
         private void StartInitialBatch(
-            Queue<Func<Task<IDownloadTarget>>> queue,
-            List<Task<IDownloadTarget>> active,
-            int maxConcurrent)
+            Queue<Func<Task<IDownloadTarget>>> queue, List<Task<IDownloadTarget>> active, int maxConcurrent)
         {
             while (active.Count < maxConcurrent && queue.Count > 0)
-            {
                 active.Add(queue.Dequeue().Invoke());
-            }
         }
 
-        private void StartNextIfAvailable(
-            Queue<Func<Task<IDownloadTarget>>> queue,
-            List<Task<IDownloadTarget>> active)
+        private void StartNextIfAvailable(Queue<Func<Task<IDownloadTarget>>> queue, List<Task<IDownloadTarget>> active)
         {
             if (queue.Count > 0)
-            {
                 active.Add(queue.Dequeue().Invoke());
-            }
         }
     }
 }

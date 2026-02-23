@@ -121,32 +121,5 @@ namespace Downloader.Service
 
         private string GetCellTrimmedOrEmpty(IXLRow row, int columnNumber)
             => row.Cell(columnNumber).GetString()?.Trim() ?? string.Empty;
-
-        private List<IDownloadTarget> FilterTargetsWithoutLinks(List<IDownloadTarget> targets)
-        {
-            if (targets.Count == 0)
-                return targets;
-
-            var filtered = new List<IDownloadTarget>(targets.Count);
-
-            foreach (var target in targets)
-            {
-                if (HasAnyLink(target))
-                {
-                    filtered.Add(target);
-                    continue;
-                }
-
-                logger.LogWarning(
-                    "Removing target '{OutputFileName}' because neither {PrimaryLink} nor {SecondaryLink} is set.",
-                    target.OutputFileName, nameof(IDownloadTarget.PrimaryLink), nameof(IDownloadTarget.SecondaryLink));
-            }
-
-            return filtered;
-        }
-
-        private bool HasAnyLink(IDownloadTarget t)
-            => !string.IsNullOrWhiteSpace(t.PrimaryLink)
-               || !string.IsNullOrWhiteSpace(t.SecondaryLink);
     }
 }
