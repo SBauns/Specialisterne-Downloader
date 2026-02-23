@@ -102,6 +102,7 @@ namespace Downloader.Executor
             services.AddScoped<IDownloadService, DownloadService>();
             services.AddScoped<IFileService, LocalDriveFileService>();
             services.AddScoped<IReportService, MarkdownReportService>();
+            services.AddScoped<IInputReaderService, ExcelInputReaderService>();
 
         }
 
