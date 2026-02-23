@@ -51,7 +51,9 @@ namespace Downloader.Service
 
             await GenerateAndExportReport(targetsForReport);
 
-            LogCompleted(downloadedTargets.Count, invalidTargets.Count, targetsForReport.Count);
+            logger.LogInformation(
+                "Workflow completed. Downloaded: {DownloadedCount}, Invalid: {InvalidCount}, Total: {TotalCount}",
+                downloadedTargets.Count, invalidTargets.Count, targetsForReport.Count);
         }
 
         private sealed record TargetCounts(int Valid, int Invalid)
@@ -103,13 +105,6 @@ namespace Downloader.Service
         {
             string report = reportService.GenerateReport(targetsForReport);
             await fileService.ExportReport(report);
-        }
-
-        private void LogCompleted(int downloadedCount, int invalidCount, int totalCount)
-        {
-            logger.LogInformation(
-                "Workflow completed. Downloaded: {DownloadedCount}, Invalid: {InvalidCount}, Total: {TotalCount}",
-                downloadedCount, invalidCount, totalCount);
         }
 
         private async Task<(IList<IDownloadTarget> validTargets, IList<IDownloadTarget> invalidTargets)> LoadTargets()
