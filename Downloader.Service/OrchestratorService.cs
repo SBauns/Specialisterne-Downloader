@@ -35,7 +35,7 @@ namespace Downloader.Service
 
             if (ShouldExitWithoutReport(counts))
             {
-                LogExitWithoutReport();
+                logger.LogInformation("Workflow completed with no targets and no report.");
                 return;
             }
 
@@ -45,7 +45,8 @@ namespace Downloader.Service
                 return;
             }
 
-            var downloadedTargets = await DownloadValidTargets(validTargets);
+            var downloadedTargets = await DownloadWithConcurrencyLimit(validTargets,
+                options.Value.MaxConcurrentDownloads);
             var targetsForReport = MergeForReport(downloadedTargets, invalidTargets);
 
             await GenerateAndExportReport(targetsForReport);
@@ -73,11 +74,6 @@ namespace Downloader.Service
             return counts.Valid == 0 && counts.Invalid > 0;
         }
 
-        private void LogExitWithoutReport()
-        {
-            logger.LogInformation("Workflow completed with no targets and no report.");
-        }
-
         private async Task GenerateAndExportInvalidOnlyReport(
             IList<IDownloadTarget> invalidTargets, TargetCounts counts)
         {
@@ -88,11 +84,6 @@ namespace Downloader.Service
             await GenerateAndExportReport(invalidTargets);
 
             logger.LogInformation("Workflow completed. Downloaded: 0, Invalid: {InvalidCount}", counts.Invalid);
-        }
-
-        private Task<IList<IDownloadTarget>> DownloadValidTargets(IList<IDownloadTarget> validTargets)
-        {
-            return DownloadAllWithConcurrencyLimit(validTargets, options.Value.MaxConcurrentDownloads);
         }
 
         private IList<IDownloadTarget> MergeForReport(
@@ -158,7 +149,7 @@ namespace Downloader.Service
             return !string.IsNullOrWhiteSpace(target.PrimaryLink) || !string.IsNullOrWhiteSpace(target.SecondaryLink);
         }
 
-        private async Task<IList<IDownloadTarget>> DownloadAllWithConcurrencyLimit(
+        private async Task<IList<IDownloadTarget>> DownloadWithConcurrencyLimit(
             IList<IDownloadTarget> targets, int maxConcurrentDownloads)
         {
             var workQueue = BuildWorkQueue(targets);
