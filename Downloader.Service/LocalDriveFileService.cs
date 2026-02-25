@@ -6,6 +6,7 @@ using Downloader.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
+using Downloader.Extensions;
 
 namespace Downloader.Service
 {
@@ -57,6 +58,8 @@ namespace Downloader.Service
 
             if (fileStream is null)
                 throw new ArgumentNullException(nameof(fileStream));
+
+            logger.BeginTargetScope(fileName);
 
             var exportPath = options.Value.DownloadedFilesOutputPath;
 
