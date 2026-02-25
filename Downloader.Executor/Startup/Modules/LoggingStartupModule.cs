@@ -12,11 +12,11 @@ namespace Downloader.Executor.Startup.Modules
         private const string LOG_PATTERN =
             "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u}] [{SourceContext}] [{Scope}] {Message:lj}{NewLine}{Exception}";
 
-        private readonly string logDirectory;
+        public static string LogDirectory = null!;
 
         public LoggingStartupModule(string applicationDataPath)
         {
-            logDirectory = Path.Combine(applicationDataPath, "Logs");
+            LogDirectory = Path.Combine(applicationDataPath, "Logs");
         }
 
         /// <inheritdoc />
@@ -58,7 +58,7 @@ namespace Downloader.Executor.Startup.Modules
             level = LogEventLevel.Debug;
 #endif
 
-            var logPath = Path.Combine(logDirectory, "log-.log");
+            var logPath = Path.Combine(LogDirectory, "log-.log");
 
             configuration = configuration.WriteTo.Console(outputTemplate: LOG_PATTERN);
             configuration = configuration.WriteTo.File(logPath, outputTemplate: LOG_PATTERN, shared: true,

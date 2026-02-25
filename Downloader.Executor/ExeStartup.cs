@@ -32,7 +32,7 @@ namespace Downloader.Executor
             };
         }
 
-        private string GetApplicationDataPath()
+        public string GetApplicationDataPath()
         {
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 SHARED_ROOT_FOLDER_NAME, APP_FOLDER_NAME);
