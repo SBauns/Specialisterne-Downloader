@@ -15,5 +15,8 @@ namespace Downloader.Model
 
         /// <inheritdoc />
         public bool WasSuccessfullyDownloaded { get; set; }
+
+        /// <inheritdoc />
+        public TimeSpan? TimeToDownload { get; set; }
     }
 }

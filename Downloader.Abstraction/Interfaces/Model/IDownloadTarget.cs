@@ -6,5 +6,6 @@
         string? PrimaryLink { get; set; }
         string? SecondaryLink { get; set; }
         bool WasSuccessfullyDownloaded { get; set; }
+        TimeSpan? TimeToDownload { get; set; }
     }
 }
