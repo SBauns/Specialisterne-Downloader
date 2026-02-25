@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Nodes;
 using Downloader.Abstraction.Interfaces.Services;
 using Downloader.Executor.Startup;
 using Downloader.Executor.Startup.Modules;
@@ -47,45 +48,123 @@ namespace Downloader.Executor
         {
             var appSettingsPath = Path.Combine(GetApplicationDataPath(), "appsettings.json");
 
-            EnsureAppSettingsExists(appSettingsPath);
+            EnsureAndNormalizeAppSettings(appSettingsPath);
 
             configurationBuilder.AddJsonFile(appSettingsPath, false, true);
         }
 
-        private void EnsureAppSettingsExists(string appSettingsPath)
+        private void EnsureAndNormalizeAppSettings(string appSettingsPath)
         {
-            if (File.Exists(appSettingsPath))
+            var directory = Path.GetDirectoryName(appSettingsPath) ??
+                            throw new InvalidOperationException(
+                                $"Could not determine directory for '{appSettingsPath}'.");
+
+            Directory.CreateDirectory(directory);
+
+            var rootObj = LoadOrCreateRootObject(appSettingsPath, out var createdNewFile);
+
+            var changed = createdNewFile;
+
+            var downloaderObj = EnsureDownloaderSection(rootObj, ref changed);
+            changed |= NormalizeDownloaderBounds(downloaderObj);
+
+            if (changed)
+                WriteAppSettings(appSettingsPath, rootObj);
+        }
+
+        private JsonObject LoadOrCreateRootObject(string appSettingsPath, out bool createdNewFile)
+        {
+            createdNewFile = false;
+
+            if (!File.Exists(appSettingsPath))
             {
-                return;
+                createdNewFile = true;
+                return CreateDefaultRootObject();
             }
 
             try
             {
-                var directory = Path.GetDirectoryName(appSettingsPath) ??
-                                throw new InvalidOperationException(
-                                    $"Could not determine directory for '{appSettingsPath}'.");
+                var jsonText = File.ReadAllText(appSettingsPath);
+                var node = JsonNode.Parse(jsonText);
 
-                Directory.CreateDirectory(directory);
+                if (node is JsonObject obj)
+                    return obj;
 
-                var appSettingsObject = new
-                {
-                    Downloader = defaultDownloaderSettings
-                };
-
-                var json = JsonSerializer.Serialize(appSettingsObject,
-                    new JsonSerializerOptions {WriteIndented = true});
-
-                using var stream =
-                    new FileStream(appSettingsPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                using var writer = new StreamWriter(stream);
-                writer.Write(json);
+                // If root isn't an object, treat it as corrupt and recreate
+                createdNewFile = true;
+                return CreateDefaultRootObject();
             }
-            catch (Exception ex)
+            catch
             {
-                throw new InvalidOperationException(
-                    $"Missing '{appSettingsPath}' and failed to generate a default one. " +
-                    $"Fix permissions / path and re-run.", ex);
+                // If parsing fails, fall back to default (fail-safe)
+                createdNewFile = true;
+                return CreateDefaultRootObject();
             }
+        }
+
+        private JsonObject CreateDefaultRootObject()
+        {
+            return new JsonObject
+            {
+                ["Downloader"] = JsonSerializer.SerializeToNode(defaultDownloaderSettings)
+            };
+        }
+
+        private JsonObject EnsureDownloaderSection(JsonObject rootObj, ref bool changed)
+        {
+            if (rootObj["Downloader"] is JsonObject downloaderObj)
+                return downloaderObj;
+
+            downloaderObj = JsonSerializer.SerializeToNode(defaultDownloaderSettings) as JsonObject
+                            ?? new JsonObject();
+
+            rootObj["Downloader"] = downloaderObj;
+            changed = true;
+
+            return downloaderObj;
+        }
+
+        private bool NormalizeDownloaderBounds(JsonObject downloaderObj)
+        {
+            var changed = false;
+
+            changed |= NormalizeIntMinMinusOne(
+                downloaderObj,
+                nameof(DownloaderSettings.TargetStartIndex));
+
+            changed |= NormalizeIntMinMinusOne(
+                downloaderObj,
+                nameof(DownloaderSettings.TargetEndIndex));
+
+            return changed;
+        }
+
+        private bool NormalizeIntMinMinusOne(JsonObject section, string propertyName)
+        {
+            if (section[propertyName] is null)
+                return false;
+
+            if (section[propertyName] is not JsonValue val)
+                return false;
+
+            if (!val.TryGetValue<int>(out var current))
+                return false;
+
+            if (current >= -1)
+                return false;
+
+            section[propertyName] = -1;
+            return true;
+        }
+
+        private void WriteAppSettings(string appSettingsPath, JsonObject rootObj)
+        {
+            var json = rootObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+
+            var tmpPath = appSettingsPath + ".tmp";
+            File.WriteAllText(tmpPath, json);
+            File.Copy(tmpPath, appSettingsPath, overwrite: true);
+            File.Delete(tmpPath);
         }
 
 
@@ -119,8 +198,15 @@ namespace Downloader.Executor
             return true;
         }
 
-        private static bool ValidateIntegerSettings(DownloaderSettings settings)
+        private bool ValidateIntegerSettings(DownloaderSettings settings)
         {
+            // Normalize target slicing bounds (soft validation)
+            if (settings.TargetStartIndex < -1)
+                settings.TargetStartIndex = -1;
+
+            if (settings.TargetEndIndex < -1)
+                settings.TargetEndIndex = -1;
+
             // Must be at least 1 — otherwise nothing downloads
             if (settings.MaxConcurrentDownloads < 1)
                 return false;
@@ -136,7 +222,7 @@ namespace Downloader.Executor
             return true;
         }
 
-        private static bool ValidateStringSettings(DownloaderSettings settings)
+        private bool ValidateStringSettings(DownloaderSettings settings)
         {
             // ---- Required string properties ----
             if (string.IsNullOrWhiteSpace(settings.DownloadedFilesOutputPath))
