@@ -10,7 +10,7 @@ namespace Downloader.Executor.Startup.Modules
     public class LoggingStartupModule : IStartupModule
     {
         private const string LOG_PATTERN =
-            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u}] [{SourceContext}] [{Properties:j}] {Message:lj}{NewLine}{Exception}";
+            "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u}] [{SourceContext}] [{Scope}] {Message:lj}{NewLine}{Exception}";
 
         private readonly string logDirectory;
 
