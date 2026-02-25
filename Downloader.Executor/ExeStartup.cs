@@ -103,7 +103,6 @@ namespace Downloader.Executor
             services.AddScoped<IFileService, LocalDriveFileService>();
             services.AddScoped<IReportService, MarkdownReportService>();
             services.AddScoped<IInputReaderService, ExcelInputReaderService>();
-
         }
 
         private bool ValidateDownloaderSettings(DownloaderSettings? settings)

@@ -1,4 +1,5 @@
 ﻿using ClosedXML.Excel;
+using Downloader.Abstraction.Enum;
 using Downloader.Abstraction.Interfaces.Model;
 using Downloader.Abstraction.Interfaces.Services;
 using Downloader.Model;
@@ -27,10 +28,9 @@ namespace Downloader.Service
             using var workbook = OpenWorkbook(path);
             var worksheet = GetWorksheet(workbook);
 
-            var rawTargets = ReadTargetsFromWorksheet(worksheet);
-            var filteredTargets = FilterTargetsWithoutLinks(rawTargets);
+            var targets = ReadTargetsFromWorksheet(worksheet);
 
-            return Task.FromResult<IList<IDownloadTarget>>(filteredTargets);
+            return Task.FromResult<IList<IDownloadTarget>>(targets);
         }
 
         private string ValidateExcelPath(string sourceFile)
@@ -113,7 +113,7 @@ namespace Downloader.Service
                 OutputFileName = outputFileName,
                 PrimaryLink = primaryLink,
                 SecondaryLink = secondaryLink,
-                WasSuccessfullyDownloaded = false
+                DownloadedUsing = DownloadedUsing.NONE,
             };
 
             return true;
