@@ -104,7 +104,7 @@ namespace Downloader.Service
         private async Task GenerateAndExportReport(IList<IDownloadTarget> targetsForReport)
         {
             string report = reportService.GenerateReport(targetsForReport);
-            await fileService.ExportReport(report);
+            await fileService.ExportReport(report, reportService.GetOutputFileExtension());
         }
 
         private async Task<(IList<IDownloadTarget> validTargets, IList<IDownloadTarget> invalidTargets)> LoadTargets()
@@ -119,24 +119,24 @@ namespace Downloader.Service
             if (targets.Count == 0)
                 return (targets, targets);
 
-            var filtered = new List<IDownloadTarget>(targets.Count);
-            var removed = new List<IDownloadTarget>(targets.Count);
+            var hasLink = new List<IDownloadTarget>(targets.Count);
+            var doesNotHaveLink = new List<IDownloadTarget>(targets.Count);
 
             foreach (IDownloadTarget target in targets)
             {
                 if (HasAnyLink(target))
                 {
-                    filtered.Add(target);
+                    hasLink.Add(target);
                     continue;
                 }
 
-                removed.Add(target);
+                doesNotHaveLink.Add(target);
                 logger.LogWarning(
                     "Removing target '{OutputFileName}' because neither {PrimaryLink} nor {SecondaryLink} is set.",
                     target.OutputFileName, nameof(IDownloadTarget.PrimaryLink), nameof(IDownloadTarget.SecondaryLink));
             }
 
-            return (filtered, removed);
+            return (hasLink, doesNotHaveLink);
         }
 
         private bool HasAnyLink(IDownloadTarget target)
@@ -177,7 +177,7 @@ namespace Downloader.Service
                 var finished = await Task.WhenAny(active);
                 active.Remove(finished);
 
-                // Fail-fast: exceptions bubble up here
+                // Fail-fast: exceptions bubbles up here
                 completed.Add(await finished);
 
                 StartNextIfAvailable(queue, active);
