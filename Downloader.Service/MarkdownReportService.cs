@@ -10,5 +10,11 @@ namespace Downloader.Service
         {
             throw new NotImplementedException();
         }
+
+        /// <inheritdoc />
+        public string GetOutputFileExtension()
+        {
+            return ".md";
+        }
     }
 }
