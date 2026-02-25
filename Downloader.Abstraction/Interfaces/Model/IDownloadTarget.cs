@@ -1,11 +1,14 @@
-﻿namespace Downloader.Abstraction.Interfaces.Model
+﻿using Downloader.Abstraction.Enum;
+
+namespace Downloader.Abstraction.Interfaces.Model
 {
     public interface IDownloadTarget
     {
         string OutputFileName { get; set; }
+        string? FullOutputFileName { get; set; }
         string? PrimaryLink { get; set; }
         string? SecondaryLink { get; set; }
-        bool WasSuccessfullyDownloaded { get; set; }
+        DownloadedUsing DownloadedUsing { get; set; }
         TimeSpan? TimeToDownload { get; set; }
     }
 }

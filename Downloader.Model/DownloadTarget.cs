@@ -1,4 +1,5 @@
-﻿using Downloader.Abstraction.Interfaces.Model;
+﻿using Downloader.Abstraction.Enum;
+using Downloader.Abstraction.Interfaces.Model;
 
 namespace Downloader.Model
 {
@@ -8,13 +9,16 @@ namespace Downloader.Model
         public string OutputFileName { get; set; }
 
         /// <inheritdoc />
+        public string? FullOutputFileName { get; set; }
+
+        /// <inheritdoc />
         public string PrimaryLink { get; set; }
 
         /// <inheritdoc />
         public string SecondaryLink { get; set; }
 
         /// <inheritdoc />
-        public bool WasSuccessfullyDownloaded { get; set; }
+        public DownloadedUsing DownloadedUsing { get; set; }
 
         /// <inheritdoc />
         public TimeSpan? TimeToDownload { get; set; }

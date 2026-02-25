@@ -6,6 +6,7 @@ using Downloader.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Net;
+using Downloader.Abstraction.Enum;
 using Downloader.Extensions;
 
 namespace Downloader.Service
@@ -51,8 +52,12 @@ namespace Downloader.Service
         }
 
         /// <inheritdoc />
-        public async Task ExportDownloadedFile(string fileName, string downloadSourceLink, Stream fileStream)
+        public async Task ExportDownloadedFile(IDownloadTarget target, Stream fileStream)
         {
+            if (target is null)
+                throw new ArgumentNullException(nameof(target));
+
+            var fileName = target.OutputFileName;
             if (string.IsNullOrWhiteSpace(fileName))
                 throw new ArgumentException("File name must be provided.", nameof(fileName));
 
@@ -62,6 +67,8 @@ namespace Downloader.Service
             logger.BeginTargetScope(fileName);
 
             var exportPath = options.Value.DownloadedFilesOutputPath;
+
+            var downloadSourceLink = GetUsedDownloadLink(target);
 
             logger.LogInformation("Exporting downloaded file '{FileName}' from source '{SourceLink}'.", fileName,
                 downloadSourceLink);
@@ -75,6 +82,7 @@ namespace Downloader.Service
             var finalFileName = string.IsNullOrEmpty(extension) ? fileName : fileName + extension;
             var fullPath = Path.Combine(exportPath, finalFileName);
             logger.LogDebug("Resolved output file path: {FullPath}", fullPath);
+            target.FullOutputFileName = fullPath;
 
             if (fileStream.CanSeek && fileStream.Position != 0)
             {
@@ -94,6 +102,17 @@ namespace Downloader.Service
 
             logger.LogInformation("Exported file '{FullPath}' successfully in {ElapsedMs} ms.", fullPath,
                 sw.ElapsedMilliseconds);
+        }
+
+        private string? GetUsedDownloadLink(IDownloadTarget target)
+        {
+            return target.DownloadedUsing switch
+            {
+                DownloadedUsing.PRIMARY => target.PrimaryLink,
+                DownloadedUsing.SECONDARY => target.SecondaryLink,
+                _ => throw new InvalidOperationException(
+                    $"{nameof(target)} has marked the file to be downloaded from {nameof(DownloadedUsing.NONE)} which is invalid."),
+            };
         }
 
         private string GetExtensionFromLink(string? downloadSourceLink)
