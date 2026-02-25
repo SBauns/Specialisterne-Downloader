@@ -40,5 +40,28 @@
         /// Suggested value: 1 - 15
         /// </summary>
         public int SecondsWaitBetweenRetry { get; set; } = 5;
+
+        /// <summary>
+        /// Defines the lower inclusive index bound of the targets to generate.
+        /// 
+        /// A value of -1 means no lower limit (start from the first target).
+        /// 
+        /// Example:
+        ///     0  -> start from first target
+        ///     10 -> start from the 11th target
+        ///     -1 -> no lower bound
+        /// </summary>
+        public int TargetStartIndex { get; set; } = -1;
+
+        /// <summary>
+        /// Defines the upper inclusive index bound of the targets to generate.
+        /// 
+        /// A value of -1 means no upper limit (include all remaining targets).
+        /// 
+        /// Example:
+        ///     99 -> stop at the 100th target
+        ///     -1 -> no upper bound
+        /// </summary>
+        public int TargetEndIndex { get; set; } = -1;
     }
 }
