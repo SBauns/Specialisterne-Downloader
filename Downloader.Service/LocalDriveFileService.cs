@@ -273,11 +273,56 @@ namespace Downloader.Service
         }
 
         /// <inheritdoc />
-        public Task ExportReport(string content, string fileExtension)
+        public async Task ExportReport(string content, string fileExtension)
         {
+            if (string.IsNullOrWhiteSpace(content))
+                throw new ArgumentException("Content cannot be null or empty.", nameof(content));
+
+            if (string.IsNullOrWhiteSpace(fileExtension))
+                throw new ArgumentException("File extension cannot be null or empty.", nameof(fileExtension));
+
             var exportPath = options.Value.ReportsOutputPath;
 
-            return Task.CompletedTask;
+            logger.LogInformation("Starting report export. Extension: {Extension}", fileExtension);
+
+            var fullPath = BuildReportOutputPath(exportPath, fileExtension);
+
+            await WriteReportFile(fullPath, content);
+        }
+
+        private string BuildReportOutputPath(string exportPath, string fileExtension)
+        {
+            if (string.IsNullOrWhiteSpace(exportPath))
+                throw new InvalidOperationException("ReportsOutputPath is not configured.");
+
+            Directory.CreateDirectory(exportPath);
+
+            fileExtension = fileExtension.Trim().TrimStart('.');
+
+            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
+            var fileName = $"report-{datePart}.{fileExtension}";
+            var fullPath = Path.Combine(exportPath, fileName);
+
+            logger.LogDebug("Resolved report file path. FileName: {FileName}, FullPath: {FullPath}", fileName,
+                fullPath);
+
+            return fullPath;
+        }
+
+        private async Task WriteReportFile(string fullPath, string content)
+        {
+            try
+            {
+                await File.WriteAllTextAsync(fullPath, content);
+
+                logger.LogInformation("Report successfully exported to {FullPath}. Size: {ContentLength} characters",
+                    fullPath, content.Length);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to export report to {FullPath}", fullPath);
+                throw;
+            }
         }
     }
 }
