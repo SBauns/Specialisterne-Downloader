@@ -1,14 +1,26 @@
-﻿using ClosedXML.Excel;
+﻿using System.Diagnostics;
+using ClosedXML.Excel;
 using Downloader.Abstraction.Interfaces.Model;
 using Downloader.Abstraction.Interfaces.Services;
 using Downloader.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Net;
 
 namespace Downloader.Service
 {
     public class LocalDriveFileService : IFileService
     {
+        private static readonly HashSet<string> WrapperExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".aspx", ".asp", ".php", ".ashx", ".jsp", ".do", ".html", ".htm", ".shtml", ".page"
+        };
+
+        private static readonly HashSet<string> CompressionExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gz", ".gzip", ".bz2", ".xz", ".zst"
+        };
+
         private readonly ILogger<LocalDriveFileService> logger;
         private readonly IInputReaderService inputReader;
         private readonly IOptions<DownloaderSettings> options;
@@ -25,19 +37,247 @@ namespace Downloader.Service
         {
             var inputSourceFile = options.Value.FilesToDownloadExcelInput;
 
-            return await inputReader.LoadTargets(inputSourceFile);
+            logger.LogInformation("Loading download targets from input file: {InputFile}", inputSourceFile);
+
+            var sw = Stopwatch.StartNew();
+            var targets = await inputReader.LoadTargets(inputSourceFile);
+            sw.Stop();
+
+            logger.LogInformation("Loaded {TargetCount} download targets from input file in {ElapsedMs} ms.",
+                targets.Count, sw.ElapsedMilliseconds);
+
+            return targets;
         }
 
         /// <inheritdoc />
-        public Task ExportDownloadedFile(string fileName, object file)
+        public async Task ExportDownloadedFile(string fileName, string downloadSourceLink, Stream fileStream)
         {
-            throw new NotImplementedException();
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new ArgumentException("File name must be provided.", nameof(fileName));
+
+            if (fileStream is null)
+                throw new ArgumentNullException(nameof(fileStream));
+
+            var exportPath = options.Value.DownloadedFilesOutputPath;
+
+            logger.LogInformation("Exporting downloaded file '{FileName}' from source '{SourceLink}'.", fileName,
+                downloadSourceLink);
+
+            Directory.CreateDirectory(exportPath);
+            logger.LogDebug("Ensured export directory exists: {ExportPath}", exportPath);
+
+            var extension = GetExtensionFromLink(downloadSourceLink);
+            logger.LogDebug("Resolved extension '{Extension}' from source link.", extension);
+
+            var finalFileName = string.IsNullOrEmpty(extension) ? fileName : fileName + extension;
+            var fullPath = Path.Combine(exportPath, finalFileName);
+            logger.LogDebug("Resolved output file path: {FullPath}", fullPath);
+
+            if (fileStream.CanSeek && fileStream.Position != 0)
+            {
+                logger.LogDebug("Input stream position was {Position}; resetting to 0 before writing.",
+                    fileStream.Position);
+                fileStream.Position = 0;
+            }
+
+            var sw = Stopwatch.StartNew();
+
+            await using var file = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None,
+                bufferSize: 81920, useAsync: true);
+
+            await fileStream.CopyToAsync(file);
+
+            sw.Stop();
+
+            logger.LogInformation("Exported file '{FullPath}' successfully in {ElapsedMs} ms.", fullPath,
+                sw.ElapsedMilliseconds);
+        }
+
+        private string GetExtensionFromLink(string? downloadSourceLink)
+        {
+            return !TryGetFilePart(downloadSourceLink, out var filePart) ? string.Empty : ResolveExtensionFromFilePart(filePart);
+        }
+
+        private bool TryGetFilePart(string? downloadSourceLink, out string filePart)
+        {
+            filePart = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(downloadSourceLink))
+            {
+                logger.LogDebug("No source link provided; cannot determine extension.");
+                return false;
+            }
+
+            var normalized = NormalizeLink(downloadSourceLink);
+
+            filePart = ExtractFilePart(normalized);
+
+            if (string.IsNullOrEmpty(filePart))
+            {
+                logger.LogDebug(
+                    "Could not extract file part from source link: {SourceLink}",
+                    downloadSourceLink);
+
+                return false;
+            }
+
+            return true;
+        }
+
+        private string ResolveExtensionFromFilePart(string filePart)
+        {
+            var lastExt = Path.GetExtension(filePart);
+
+            if (string.IsNullOrEmpty(lastExt))
+            {
+                logger.LogDebug("No extension found in file part '{FilePart}'.", filePart);
+                return string.Empty;
+            }
+
+            if (IsWrapperExtension(lastExt))
+                return ResolveWrapperExtension(filePart, lastExt);
+
+            if (IsCompressionExtension(lastExt))
+                return ResolveCompressionExtension(filePart, lastExt);
+
+            logger.LogDebug("Using extension '{Extension}' from file part '{FilePart}'.", lastExt, filePart);
+            return lastExt;
+        }
+
+        private string ResolveWrapperExtension(string filePart, string wrapperExt)
+        {
+            var recovered = RecoverExtensionBeforeWrapper(filePart, wrapperExt);
+
+            logger.LogDebug(
+                "Wrapper extension '{WrapperExt}' detected. Recovered '{RecoveredExt}' from '{FilePart}'.",
+                wrapperExt,
+                recovered ?? "(none)",
+                filePart);
+
+            return recovered ?? string.Empty;
+        }
+
+        private string ResolveCompressionExtension(string filePart, string compressionExt)
+        {
+            var combined = BuildDoubleExtensionIfPossible(filePart, compressionExt);
+
+            logger.LogDebug(
+                "Compression extension '{CompressionExt}' detected. Using '{CombinedExt}' from '{FilePart}'.",
+                compressionExt,
+                combined,
+                filePart);
+
+            return combined;
+        }
+
+        /// <summary>
+        /// Normalizes a download source link to a clean path that can be used for file name
+        /// and extension extraction.
+        ///
+        /// The method performs the following steps:
+        /// <list type="number">
+        /// <item><description>Trims surrounding whitespace.</description></item>
+        /// <item><description>Decodes HTML entities (e.g. <c>&amp;amp;</c> → <c>&amp;</c>).</description></item>
+        /// <item><description>Removes fragment identifiers (anything after <c>#</c>).</description></item>
+        /// <item><description>Removes query strings (anything after <c>?</c>).</description></item>
+        /// <item><description>If the link is an absolute URI, reduces it to its <c>AbsolutePath</c>.</description></item>
+        /// </list>
+        ///
+        /// Examples:
+        /// <example>
+        /// <code>
+        /// https://example.com/report.pdf?la=en            -> /report.pdf
+        /// https://example.com/report.pdf#zoom=50          -> /report.pdf
+        /// https://example.com/report.pdf?la=en&amp;utm=abc    -> /report.pdf
+        /// https://example.com/docs/report.pdf             -> /docs/report.pdf
+        /// /docs/report.pdf                                -> /docs/report.pdf
+        /// report.pdf                                      -> report.pdf
+        /// </code>
+        /// </example>
+        /// </summary>
+        private string NormalizeLink(string link)
+        {
+            var trimmed = link.Trim();
+            var decoded = WebUtility.HtmlDecode(trimmed);
+
+            var withoutFragment = CutAtFirst(decoded, '#');
+            var withoutQuery = CutAtFirst(withoutFragment, '?');
+            var path = ToPath(withoutQuery);
+
+            if (!string.Equals(link, path, StringComparison.Ordinal))
+            {
+                logger.LogDebug("Normalized source link from '{Original}' to '{Normalized}'.", link, path);
+            }
+
+            return path;
+        }
+
+        private string ToPath(string linkOrPath)
+        {
+            if (!Uri.TryCreate(linkOrPath, UriKind.Absolute, out var uri))
+                return linkOrPath;
+
+            logger.LogDebug("Parsed absolute URI; using AbsolutePath '{AbsolutePath}'.", uri.AbsolutePath);
+            return uri.AbsolutePath;
+
+        }
+
+        private string ExtractFilePart(string path)
+        {
+            var normalized = path.Replace('\\', '/');
+            var lastSlash = normalized.LastIndexOf('/');
+            return lastSlash >= 0 ? normalized[(lastSlash + 1)..] : normalized;
+        }
+
+        private string CutAtFirst(string input, char delimiter)
+        {
+            var idx = input.IndexOf(delimiter);
+            return idx >= 0 ? input[..idx] : input;
+        }
+
+        private bool IsWrapperExtension(string extension)
+            => WrapperExtensions.Contains(extension);
+
+        private bool IsCompressionExtension(string extension)
+            => CompressionExtensions.Contains(extension);
+
+        private string BuildDoubleExtensionIfPossible(string filePart, string compressionExt)
+        {
+            var withoutCompression = Path.GetFileNameWithoutExtension(filePart);
+            var previousExt = Path.GetExtension(withoutCompression);
+
+            var result = string.IsNullOrEmpty(previousExt) ? compressionExt : previousExt + compressionExt;
+
+            logger.LogDebug(
+                "Double-extension resolution: filePart='{FilePart}', previousExt='{PreviousExt}', compressionExt='{CompressionExt}', result='{Result}'.",
+                filePart, string.IsNullOrEmpty(previousExt) ? "(none)" : previousExt, compressionExt, result);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Attempts to recover the real file extension when a URL ends with a wrapper extension
+        /// such as <c>.aspx</c>, <c>.php</c>, etc. Examples:
+        /// <example>
+        /// <code>
+        /// Report_2017.pdf.aspx  ->  .pdf
+        /// download.xml.ashx     ->  .xml
+        /// </code>
+        /// </example>
+        /// </summary>
+        private string? RecoverExtensionBeforeWrapper(string filePart, string wrapperExt)
+        {
+            var withoutWrapper = filePart[..^wrapperExt.Length];
+            var previousExt = Path.GetExtension(withoutWrapper);
+            return string.IsNullOrEmpty(previousExt) ? null : previousExt;
         }
 
         /// <inheritdoc />
-        public Task ExportReport(string content)
+        public Task ExportReport(string content, string fileExtension)
         {
-            throw new NotImplementedException();
+            var exportPath = options.Value.ReportsOutputPath;
+
+            return Task.CompletedTask;
         }
     }
 }
