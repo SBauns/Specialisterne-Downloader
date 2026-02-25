@@ -64,7 +64,8 @@ namespace Downloader.Service
             if (fileStream is null)
                 throw new ArgumentNullException(nameof(fileStream));
 
-            logger.BeginTargetScope(fileName);
+            // Scope has already been created during the Download Step.
+            //logger.BeginTargetScope(fileName);
 
             var exportPath = options.Value.DownloadedFilesOutputPath;
 
