@@ -86,7 +86,7 @@ namespace Downloader.Service
         }
 
         private async Task<DownloadAttemptResult> TryDownloadWithRetries(
-            string link, DownloadedUsing linkLabel, int maxDownloadRetries, int secondsBetweenRetries)
+            string link, DownloadedUsing downloadedUsing, int maxDownloadRetries, int secondsBetweenRetries)
         {
             using var httpClient = new HttpClient();
 
@@ -94,11 +94,11 @@ namespace Downloader.Service
             {
                 try
                 {
-                    return await HandleSuccessfulAttempt(httpClient, link, linkLabel, attempt, maxDownloadRetries);
+                    return await HandleSuccessfulAttempt(httpClient, link, downloadedUsing, attempt, maxDownloadRetries);
                 }
                 catch (Exception ex)
                 {
-                    var shouldRetry = await HandleFailedAttempt(ex, linkLabel, attempt, maxDownloadRetries,
+                    var shouldRetry = await HandleFailedAttempt(ex, downloadedUsing, attempt, maxDownloadRetries,
                         secondsBetweenRetries);
 
                     if (!shouldRetry)
@@ -106,7 +106,7 @@ namespace Downloader.Service
                 }
             }
 
-            logger.LogDebug("All retries exhausted for {LinkLabel} link.", linkLabel);
+            logger.LogDebug("All retries exhausted for {LinkLabel} link.", downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
             return DownloadAttemptResult.Failure();
         }
 
@@ -128,7 +128,9 @@ namespace Downloader.Service
         private async Task<bool> HandleFailedAttempt(
             Exception ex, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries, int secondsBetweenRetries)
         {
-            logger.LogWarning(ex, "Download attempt failed ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
+            logger.LogTrace(ex, "Download attempt failed ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
+                maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
+            logger.LogInformation("Download attempt failed ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
                 maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
 
             if (attempt >= maxDownloadRetries)
