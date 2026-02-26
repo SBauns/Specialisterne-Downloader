@@ -322,7 +322,7 @@ namespace Downloader.Service
 
             fileExtension = fileExtension.Trim().TrimStart('.');
 
-            var datePart = DateTime.UtcNow.ToString("yyyyMMdd");
+            var datePart = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var fileName = $"report-{datePart}.{fileExtension}";
             var fullPath = Path.Combine(exportPath, fileName);
 

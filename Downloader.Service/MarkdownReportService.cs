@@ -6,6 +6,7 @@ using Downloader.Model;
 using FluentMarkdown;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Globalization;
 
 namespace Downloader.Service
 {
@@ -28,8 +29,8 @@ namespace Downloader.Service
 
             var downloadExportPath = options.Value.DownloadedFilesOutputPath;
 
-            var createdAt = DateTime.UtcNow;
-            var createdAtText = createdAt.ToString("dddd, dd MMMM yyyy HH:mm 'UTC'");
+            var createdAt = DateTime.Now;
+            var createdAtText = createdAt.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture);
 
             logger.LogInformation(
                 "Generating markdown report. Targets: {TargetCount}, DownloadExportPath: {DownloadExportPath}",
@@ -142,13 +143,13 @@ namespace Downloader.Service
             if (string.IsNullOrWhiteSpace(link))
                 link = "<missing link>";
 
+            var fileName = Path.GetFileName(fullOutputFileName);
+
             var ms = timeToDownload?.TotalMilliseconds;
 
-            var msText = ms is null
-                ? "unknown ms"
-                : $"{ms.Value:0} ms";
+            var msText = ms is null ? "unknown" : $"{ms.Value:0} ms";
 
-            return $"{link} -> {fullOutputFileName} ({msText})";
+            return $"{msText,8}  {fileName,-12}  {link}";
         }
 
         /// <inheritdoc />
