@@ -79,10 +79,12 @@ namespace Downloader.Service
                 await fileService.ExportDownloadedFile(target, result.FileStream!);
             }
 
+            var formattedTime = target.TimeToDownload is null
+                ? "Unknown"
+                : target.TimeToDownload.Value.ToString(@"mm\:ss\.ff");
             logger.LogInformation(
                 "Download and export completed. Used Link: {LinkLabel}, Time To Download: {TimeToDownload}",
-                targetDownloadedUsing.ToString().ToTitleFromScreamingSnakeCase(),
-                target.TimeToDownload);
+                targetDownloadedUsing.ToString().ToTitleFromScreamingSnakeCase(), formattedTime);
 
             return true;
         }
