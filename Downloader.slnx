@@ -4,4 +4,5 @@
   <Project Path="Downloader.Extensions/Downloader.Extensions.csproj" Id="d51e37e6-0518-4b23-ba8a-5c0d70dc5d60" />
   <Project Path="Downloader.Model/Downloader.Model.csproj" Id="4c89f2d3-7c3b-48c9-8a4c-3ecfe85951a7" />
   <Project Path="Downloader.Service/Downloader.Service.csproj" Id="43549d0c-9fba-4942-af7b-a9fa3735451e" />
+  <Project Path="Downloader.Tests/Downloader.Tests.csproj" Id="02b2d67f-887a-4b6e-9ac7-749bba2e1a2a" />
 </Solution>
