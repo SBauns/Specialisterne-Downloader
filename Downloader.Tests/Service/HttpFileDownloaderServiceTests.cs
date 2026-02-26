@@ -73,7 +73,7 @@ namespace Downloader.Tests.Service
                 // Arrange
                 var link = "https://example.com/file.bin";
 
-                var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+                var handlerMock = new Mock<HttpMessageHandler>();
                 handlerMock.Protected()
                     .Setup<Task<HttpResponseMessage>>(
                         "SendAsync",
@@ -113,7 +113,7 @@ namespace Downloader.Tests.Service
                 out RequestCapture capture)
             {
                 var captureLocal = new RequestCapture();
-                var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Strict);
+                var handlerMock = new Mock<HttpMessageHandler>();
 
                 handlerMock.Protected()
                     .Setup<Task<HttpResponseMessage>>(
