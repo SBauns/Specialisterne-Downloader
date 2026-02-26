@@ -1,1 +1,198 @@
-# Specialisterne-Downloader
+# File Downloader (Downloader.Executor)
+
+Console app for downloading files listed in an Excel sheet, with configurable output folders, retries, and concurrency.
+
+> Note: For now the program is run **from source**. A single-file release build is planned later.
+
+---
+
+## Prerequisites
+
+- **.NET SDK** matching the repository’s target framework (check the `.csproj` / `global.json` in the repo).
+- **Windows** - the interactive menu opens folders using `explorer.exe`.
+- An **Excel file** containing download targets - see format below.
+
+---
+
+## Run from source
+
+From the repository root:
+
+```bash
+dotnet restore
+dotnet run --project Downloader.Executor
+```
+
+When the program starts, you’ll get an interactive menu (see commands below).
+
+---
+
+## Interactive Menu Commands
+
+When the application starts, it enters an interactive command loop.
+
+Available commands:
+
+| Command     | Description |
+|------------|-------------|
+| `reports`   | Opens the folder configured by `DownloaderSettings.ReportsOutputPath` |
+| `logs`      | Opens the log directory |
+| `downloads` | Opens the folder configured by `DownloaderSettings.DownloadedFilesOutputPath` |
+| `settings`  | Opens the application data folder |
+| `input`     | Opens the folder containing the Excel input file |
+| `run`       | Executes the download workflow |
+
+All folder commands will:
+1. Ensure the folder exists (create if necessary)
+2. Open it in Windows Explorer
+
+---
+
+## NuGet Packages
+
+The solution uses the following top-level NuGet packages.
+
+### Dependency Injection & Hosting
+
+- **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.3)
+- **Microsoft.Extensions.DependencyInjection** (10.0.3)
+- **Microsoft.Extensions.Hosting.Abstractions** (10.0.3)
+- **Microsoft.Extensions.Hosting** (10.0.3)
+
+### Configuration & Options
+
+- **Microsoft.Extensions.Configuration.Json** (10.0.3)
+- **Microsoft.Extensions.Options.ConfigurationExtensions** (10.0.3)
+
+### Logging
+
+- **Microsoft.Extensions.Logging** (10.0.3)
+- **Microsoft.Extensions.Logging.Abstractions** (10.0.3)
+- **Serilog** (4.3.1)
+- **Serilog.Extensions.Hosting** (10.0.0)
+- **Serilog.Extensions.Logging** (10.0.0)
+- **Serilog.Sinks.Console** (6.1.1)
+- **Serilog.Sinks.File** (7.0.0)
+
+### Data / File Processing
+
+- **ClosedXML** (0.105.0)
+
+### Markdown Generation
+
+- **FluentMarkdown** (1.0.1)
+
+---
+
+## Configuration (`Downloader`)
+
+Configuration is bound to the `DownloaderSettings` class using `IOptions<DownloaderSettings>`.
+
+Settings are defined in `appsettings.json` under the `Downloader` section.
+
+### Example `appsettings.json`
+
+```json
+{
+  "Downloader": {
+    "ReportsOutputPath": "C:\\Temp\\FileDownloader\\Reports",
+    "DownloadedFilesOutputPath": "C:\\Temp\\FileDownloader\\Downloads",
+    "FilesToDownloadExcelInput": "C:\\Temp\\FileDownloader\\Input\\files.xlsx",
+
+    "MaxConcurrentDownloads": 5,
+    "DownloadRetries": 3,
+    "SecondsWaitBetweenRetry": 5,
+
+    "TargetStartIndex": -1,
+    "TargetEndIndex": -1
+  }
+}
+
+```
+
+## Settings Reference
+
+### Paths
+
+#### `ReportsOutputPath` *(string, required)*
+
+Full path to the directory where generated reports are stored.
+
+Example:
+
+```text
+C:\Temp\FileDownloader\Reports
+```
+
+#### `DownloadedFilesOutputPath` *(string, required)*
+
+Full path to the directory where downloaded files are saved.
+
+Example:
+
+```text
+C:\Temp\FileDownloader\Downloads
+```
+
+#### `FilesToDownloadExcelInput` *(string, required)*
+
+Full path to the Excel file containing download targets.
+
+Expected column structure:
+
+| Column | Description              |
+|--------|--------------------------|
+| A      | Output file name         |
+| AL     | Primary download link    |
+| AM     | Secondary download link  |
+
+Absolute paths are highly recommended.
+
+### Download Behaviour
+
+#### `MaxConcurrentDownloads` *(int, default: 5)*
+
+Maximum number of concurrent downloads.
+
+Recommended range: `3–10`
+
+#### `DownloadRetries` *(int, default: 3)*
+
+Number of retry attempts before marking a link as failed.
+
+Recommended range: `1–5`
+
+#### `SecondsWaitBetweenRetry` *(int, default: 5)*
+
+Delay in seconds between retry attempts.
+
+Recommended range: `1–15`
+
+### Target Range Filtering
+
+#### `TargetStartIndex` *(int, default: -1)*
+
+Lower inclusive bound of targets to process.
+
+- `-1` → No lower bound  
+- `0` → Start from first target  
+- `10` → Start from 11th target  
+
+#### `TargetEndIndex` *(int, default: -1)*
+
+Upper inclusive bound of targets to process.
+
+- `-1` → No upper bound  
+- `99` → Stop at 100th target  
+
+---
+
+## Notes
+
+- The application is currently Windows-focused due to use of `explorer.exe`.
+
+---
+
+## Roadmap
+
+- Single-file self-contained release build  
