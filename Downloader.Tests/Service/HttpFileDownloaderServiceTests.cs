@@ -1,10 +1,4 @@
-﻿using Downloader.Service;
-using FluentAssertions;
-using Moq;
-using Moq.Protected;
-using System.Net;
-
-namespace Downloader.Tests.Service
+﻿namespace Downloader.Tests.Service
 {
     using System;
     using System.IO;
