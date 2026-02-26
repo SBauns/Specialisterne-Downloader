@@ -16,6 +16,10 @@ namespace Downloader.Service
         private const int COL_PRIMARY_LINK = 38; // AL
         private const int COL_SECONDARY_LINK = 39; // AM
 
+        public static int OutputFileNameColumnIndex => COL_OUTPUT_FILE_NAME;
+        public static int PrimaryLinkColumnIndex => COL_PRIMARY_LINK;
+        public static int SecondaryLinkColumnIndex => COL_SECONDARY_LINK;
+
         public ExcelInputReaderService(ILogger<ExcelInputReaderService> logger, IOptions<DownloaderSettings> options)
         {
             this.logger = logger;
