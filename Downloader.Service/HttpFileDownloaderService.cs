@@ -7,7 +7,10 @@ namespace Downloader.Service
     {
         private readonly HttpClient httpClient;
 
-        public HttpFileDownloaderService(HttpClient httpClient) => this.httpClient = httpClient;
+        public HttpFileDownloaderService(HttpClient httpClient)
+        {
+            this.httpClient = httpClient;
+        }
 
         public async Task<(Stream Stream, TimeSpan Elapsed)> DownloadOnce(string link, CancellationToken ct = default)
         {
