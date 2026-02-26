@@ -1,4 +1,5 @@
 ﻿using ClosedXML.Excel;
+using Downloader.Abstraction.Enum;
 using Downloader.Model;
 using Downloader.Service;
 using FluentAssertions;
@@ -166,7 +167,7 @@ namespace Downloader.Tests.Service
             target.OutputFileName.Should().Be("MyFile");
             target.PrimaryLink.Should().Be("https://primary/link");
             target.SecondaryLink.Should().Be("https://secondary/link");
-            target.DownloadedUsing.Should().Be(Downloader.Abstraction.Enum.DownloadedUsing.NONE);
+            target.DownloadedUsing.Should().Be(DownloadedUsing.NONE);
         }
 
         [Test]
