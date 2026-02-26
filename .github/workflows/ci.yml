@@ -45,7 +45,7 @@ jobs:
         run: dotnet restore ./Downloader.slnx
 
       - name: Build (Release)
-        run: dotnet build ./Downloader.sln -c Release --no-restore
+        run: dotnet build ./Downloader.slnx -c Release --no-restore
 
       - name: Test (Release)
         run: >
