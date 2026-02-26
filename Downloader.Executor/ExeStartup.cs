@@ -8,6 +8,7 @@ using Downloader.Service;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Http;
 // Reduces readability in multiple location in this file, if done.
 // ReSharper disable ConvertIfStatementToReturnStatement
 
@@ -182,6 +183,7 @@ namespace Downloader.Executor
             services.AddScoped<IFileService, LocalDriveFileService>();
             services.AddScoped<IReportService, MarkdownReportService>();
             services.AddScoped<IInputReaderService, ExcelInputReaderService>();
+            services.AddHttpClient<IHttpFileDownloaderService, HttpFileDownloaderService>();
         }
 
         private bool ValidateDownloaderSettings(DownloaderSettings? settings)

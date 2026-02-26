@@ -13,12 +13,14 @@ namespace Downloader.Service
     {
         private readonly ILogger<DownloadService> logger;
         private readonly IFileService fileService;
+        private readonly IHttpFileDownloaderService fileDownloaderService;
         private readonly IOptions<DownloaderSettings> options;
 
-        public DownloadService(ILogger<DownloadService> logger, IFileService fileService, IOptions<DownloaderSettings> options)
+        public DownloadService(ILogger<DownloadService> logger, IFileService fileService, IHttpFileDownloaderService fileDownloaderService, IOptions<DownloaderSettings> options)
         {
             this.logger = logger;
             this.fileService = fileService;
+            this.fileDownloaderService = fileDownloaderService;
             this.options = options;
         }
 
@@ -88,13 +90,11 @@ namespace Downloader.Service
         private async Task<DownloadAttemptResult> TryDownloadWithRetries(
             string link, DownloadedUsing downloadedUsing, int maxDownloadRetries, int secondsBetweenRetries)
         {
-            using var httpClient = new HttpClient();
-
             for (var attempt = 1; attempt <= maxDownloadRetries; attempt++)
             {
                 try
                 {
-                    return await HandleSuccessfulAttempt(httpClient, link, downloadedUsing, attempt, maxDownloadRetries);
+                    return await HandleSuccessfulAttempt(link, downloadedUsing, attempt, maxDownloadRetries);
                 }
                 catch (Exception ex)
                 {
@@ -110,13 +110,12 @@ namespace Downloader.Service
             return DownloadAttemptResult.Failure();
         }
 
-        private async Task<DownloadAttemptResult> HandleSuccessfulAttempt(
-            HttpClient httpClient, string link, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries)
+        private async Task<DownloadAttemptResult> HandleSuccessfulAttempt(string link, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries)
         {
             logger.LogDebug("Attempting download ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
-                maxDownloadRetries, downloadedUsing);
+                maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
 
-            var (stream, elapsed) = await DownloadOnce(httpClient, link);
+            var (stream, elapsed) = await fileDownloaderService.DownloadOnce(link);
 
             logger.LogInformation(
                 "Download attempt succeeded ({Attempt}/{Max}) using {LinkLabel} link. Elapsed: {Elapsed}", attempt,
@@ -141,24 +140,6 @@ namespace Downloader.Service
             await Task.Delay(TimeSpan.FromSeconds(secondsBetweenRetries));
 
             return true;
-        }
-
-        private async Task<(Stream Stream, TimeSpan Elapsed)> DownloadOnce(HttpClient httpClient, string link)
-        {
-            var sw = Stopwatch.StartNew();
-
-            using var response = await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
-
-            // Buffer fully so the timing reflects the full download of the attempt.
-            var bytes = await response.Content.ReadAsByteArrayAsync();
-
-            sw.Stop();
-
-            var ms = new MemoryStream(bytes, writable: false);
-            ms.Position = 0;
-
-            return (ms, sw.Elapsed);
         }
 
         private sealed record DownloadAttemptResult(bool Succeeded, Stream? FileStream, TimeSpan? TimeToDownload,

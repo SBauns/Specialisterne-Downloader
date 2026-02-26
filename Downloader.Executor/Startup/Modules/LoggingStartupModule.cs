@@ -73,6 +73,9 @@ namespace Downloader.Executor.Startup.Modules
             configuration = configuration.MinimumLevel.Override("Microsoft", LogEventLevel.Warning);
             configuration = configuration.MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Information);
 
+            configuration = configuration.MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning);
+            configuration = configuration.MinimumLevel.Override("Microsoft.Extensions.Http", LogEventLevel.Warning);
+
             return configuration;
         }
     }

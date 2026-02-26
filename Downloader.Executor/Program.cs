@@ -8,17 +8,20 @@ using Downloader.Executor.Startup.Modules;
 
 namespace Downloader.Executor
 {
-    internal class Program
+    internal class Program : IAsyncDisposable
     {
         private readonly ExeStartup startup;
+        private readonly IHost host;
+        private readonly IServiceScope scope;
+
         private readonly DownloaderSettings options;
         private readonly IOrchestratorService orchestrator;
 
         private Program(string[] args)
         {
             startup = new ExeStartup();
-            using var host = startup.BuildHost(args);
-            using var scope = host.Services.CreateScope();
+            host = startup.BuildHost(args);
+            scope = host.Services.CreateScope();
 
             options = scope.ServiceProvider.GetRequiredService<IOptions<DownloaderSettings>>().Value;
             orchestrator = scope.ServiceProvider.GetRequiredService<IOrchestratorService>();
@@ -29,6 +32,13 @@ namespace Downloader.Executor
             var program = new Program(args);
 
             await program.RunInteractiveMenu();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            scope.Dispose();
+            host.Dispose();
+            await Task.CompletedTask;
         }
 
         private async Task RunInteractiveMenu()
