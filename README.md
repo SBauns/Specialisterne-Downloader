@@ -48,43 +48,24 @@ All folder commands will:
 
 ---
 
-## NuGet Packages
+## NuGet Dependencies
 
-The solution uses the following top-level NuGet packages.
+### Application & Infrastructure
+- Microsoft.Extensions.* (DI, Hosting, Logging, Configuration, Http)
+- Serilog (Console & File logging)
+- ClosedXML (Excel parsing)
+- FluentMarkdown (Markdown report generation)
 
-### Dependency Injection & Hosting
-
-- **Microsoft.Extensions.DependencyInjection.Abstractions** (10.0.3)
-- **Microsoft.Extensions.DependencyInjection** (10.0.3)
-- **Microsoft.Extensions.Hosting.Abstractions** (10.0.3)
-- **Microsoft.Extensions.Hosting** (10.0.3)
-
-### Configuration & Options
-
-- **Microsoft.Extensions.Configuration.Json** (10.0.3)
-- **Microsoft.Extensions.Options.ConfigurationExtensions** (10.0.3)
-
-### Logging
-
-- **Microsoft.Extensions.Logging** (10.0.3)
-- **Microsoft.Extensions.Logging.Abstractions** (10.0.3)
-- **Serilog** (4.3.1)
-- **Serilog.Extensions.Hosting** (10.0.0)
-- **Serilog.Extensions.Logging** (10.0.0)
-- **Serilog.Sinks.Console** (6.1.1)
-- **Serilog.Sinks.File** (7.0.0)
-
-### Data / File Processing
-
-- **ClosedXML** (0.105.0)
-
-### Markdown Generation
-
-- **FluentMarkdown** (1.0.1)
+### Testing
+- NUnit (Test framework)
+- Moq (Mocking)
+- FluentAssertions (Expressive assertions)
+- Coverlet (Code coverage)
+- GitHubActionsTestLogger (CI integration)
 
 ---
 
-## Configuration (`Downloader`)
+## Configuration
 
 Configuration is bound to the `DownloaderSettings` class using `IOptions<DownloaderSettings>`.
 
