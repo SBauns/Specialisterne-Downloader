@@ -42,7 +42,7 @@ jobs:
             **/packages.lock.json
 
       - name: Restore
-        run: dotnet restore ./Downloader.sln
+        run: dotnet restore ./Downloader.slnx
 
       - name: Build (Release)
         run: dotnet build ./Downloader.sln -c Release --no-restore
