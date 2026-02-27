@@ -66,9 +66,6 @@ namespace Downloader.Service
             if (fileStream is null)
                 throw new ArgumentNullException(nameof(fileStream));
 
-            // Scope has already been created during the Download Step.
-            //logger.BeginTargetScope(fileName);
-
             string exportPath = options.Value.DownloadedFilesOutputPath;
 
             string? downloadSourceLink = GetUsedDownloadLink(target);
@@ -100,6 +97,9 @@ namespace Downloader.Service
                 81920, true);
 
             await fileStream.CopyToAsync(file);
+            await file.FlushAsync();
+
+            target.OutputFileSize = file.Length;
 
             sw.Stop();
 
