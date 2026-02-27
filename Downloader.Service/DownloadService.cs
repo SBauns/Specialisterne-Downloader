@@ -34,7 +34,7 @@ namespace Downloader.Service
             int maxDownloadTries = options.Value.DownloadRetries + 1;
             int secondsBetweenRetries = options.Value.SecondsWaitBetweenRetry;
 
-            logger.LogInformation("Starting download. Retries: {MaxRetries}, WaitBetweenRetriesSeconds: {WaitSeconds}",
+            logger.LogInformation("Starting download. Tries: {MaxTries}, Seconds Wait Between Retries: {WaitSeconds}",
                 maxDownloadTries, secondsBetweenRetries);
 
             if (await TryDownloadAndExport(target, target.PrimaryLink, DownloadedUsing.PRIMARY, maxDownloadTries,
@@ -114,16 +114,16 @@ namespace Downloader.Service
         }
 
         private async Task<DownloadAttemptResult> HandleSuccessfulAttempt(
-            string link, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries)
+            string link, DownloadedUsing downloadedUsing, int attempt, int maxDownloadTries)
         {
             logger.LogDebug("Attempting download ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
-                maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
+                maxDownloadTries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
 
             (Stream stream, TimeSpan elapsed) = await fileDownloaderService.DownloadOnce(link);
 
             logger.LogInformation(
                 "Download attempt succeeded ({Attempt}/{Max}) using {LinkLabel} link. Elapsed: {Elapsed}", attempt,
-                maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase(), elapsed);
+                maxDownloadTries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase(), elapsed);
 
             return DownloadAttemptResult.Success(stream, elapsed, downloadedUsing);
         }
