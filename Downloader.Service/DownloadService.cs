@@ -31,19 +31,19 @@ namespace Downloader.Service
         {
             using IDisposable scope = logger.BeginTargetScope(target);
 
-            int maxDownloadRetries = options.Value.DownloadRetries;
+            int maxDownloadTries = options.Value.DownloadRetries + 1;
             int secondsBetweenRetries = options.Value.SecondsWaitBetweenRetry;
 
             logger.LogInformation("Starting download. Retries: {MaxRetries}, WaitBetweenRetriesSeconds: {WaitSeconds}",
-                maxDownloadRetries, secondsBetweenRetries);
+                maxDownloadTries, secondsBetweenRetries);
 
-            if (await TryDownloadAndExport(target, target.PrimaryLink, DownloadedUsing.PRIMARY, maxDownloadRetries,
+            if (await TryDownloadAndExport(target, target.PrimaryLink, DownloadedUsing.PRIMARY, maxDownloadTries,
                     secondsBetweenRetries))
                 return target;
 
             logger.LogInformation("Primary link failed. Falling back to Secondary link.");
 
-            if (await TryDownloadAndExport(target, target.SecondaryLink, DownloadedUsing.SECONDARY, maxDownloadRetries,
+            if (await TryDownloadAndExport(target, target.SecondaryLink, DownloadedUsing.SECONDARY, maxDownloadTries,
                     secondsBetweenRetries))
                 return target;
 
@@ -55,7 +55,7 @@ namespace Downloader.Service
         }
 
         private async Task<bool> TryDownloadAndExport(
-            IDownloadTarget target, string? link, DownloadedUsing targetDownloadedUsing, int maxDownloadRetries,
+            IDownloadTarget target, string? link, DownloadedUsing targetDownloadedUsing, int maxDownloadTries,
             int secondsBetweenRetries)
         {
             if (string.IsNullOrWhiteSpace(link))
@@ -65,7 +65,7 @@ namespace Downloader.Service
                 return false;
             }
 
-            DownloadAttemptResult result = await TryDownloadWithRetries(link, targetDownloadedUsing, maxDownloadRetries,
+            DownloadAttemptResult result = await TryDownloadWithRetries(link, targetDownloadedUsing, maxDownloadTries,
                 secondsBetweenRetries);
             if (!result.Succeeded)
                 return false;
@@ -90,17 +90,17 @@ namespace Downloader.Service
         }
 
         private async Task<DownloadAttemptResult> TryDownloadWithRetries(
-            string link, DownloadedUsing downloadedUsing, int maxDownloadRetries, int secondsBetweenRetries)
+            string link, DownloadedUsing downloadedUsing, int maxDownloadTries, int secondsBetweenRetries)
         {
-            for (var attempt = 1; attempt <= maxDownloadRetries; attempt++)
+            for (var attempt = 1; attempt <= maxDownloadTries; attempt++)
             {
                 try
                 {
-                    return await HandleSuccessfulAttempt(link, downloadedUsing, attempt, maxDownloadRetries);
+                    return await HandleSuccessfulAttempt(link, downloadedUsing, attempt, maxDownloadTries);
                 }
                 catch (Exception ex)
                 {
-                    bool shouldRetry = await HandleFailedAttempt(ex, downloadedUsing, attempt, maxDownloadRetries,
+                    bool shouldRetry = await HandleFailedAttempt(ex, downloadedUsing, attempt, maxDownloadTries,
                         secondsBetweenRetries);
 
                     if (!shouldRetry)
@@ -129,15 +129,15 @@ namespace Downloader.Service
         }
 
         private async Task<bool> HandleFailedAttempt(
-            Exception ex, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries,
+            Exception ex, DownloadedUsing downloadedUsing, int attempt, int maxDownloadTries,
             int secondsBetweenRetries)
         {
             logger.LogTrace(ex, "Download attempt failed ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
-                maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
+                maxDownloadTries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
             logger.LogInformation("Download attempt failed ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
-                maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
+                maxDownloadTries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
 
-            if (attempt >= maxDownloadRetries)
+            if (attempt >= maxDownloadTries)
                 return false;
 
             logger.LogDebug("Waiting {SecondsBetweenRetries}s before retrying download.", secondsBetweenRetries);

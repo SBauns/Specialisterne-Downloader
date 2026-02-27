@@ -114,7 +114,7 @@ namespace Downloader.Tests.Service
             target.DownloadedUsing.Should().Be(DownloadedUsing.SECONDARY);
             target.TimeToDownload.Should().Be(secondaryElapsed);
 
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(3));
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(4));
             httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Once);
 
             fileServiceMock.Verify(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()), Times.Once);
@@ -141,8 +141,8 @@ namespace Downloader.Tests.Service
             target.DownloadedUsing.Should().Be(DownloadedUsing.NONE);
             target.TimeToDownload.Should().BeNull();
 
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(2));
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Exactly(2));
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(3));
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Exactly(3));
 
             fileServiceMock.Verify(fs => fs.ExportDownloadedFile(It.IsAny<IDownloadTarget>(), It.IsAny<Stream>()),
                 Times.Never);
