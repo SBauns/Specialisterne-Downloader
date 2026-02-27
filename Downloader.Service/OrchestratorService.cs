@@ -14,6 +14,7 @@ namespace Downloader.Service
         private readonly IDownloadService downloadService;
         private readonly IReportService reportService;
         private readonly IOptions<DownloaderSettings> options;
+        private TimeSpan? timeToDownload = null;
 
         public OrchestratorService(
             ILogger<OrchestratorService> logger, IFileService fileService, IDownloadService downloadService,
@@ -104,7 +105,7 @@ namespace Downloader.Service
 
         private async Task GenerateAndExportReport(IList<IDownloadTarget> targetsForReport)
         {
-            string report = reportService.GenerateReport(targetsForReport);
+            string report = reportService.GenerateReport(targetsForReport, timeToDownload);
             await fileService.ExportReport(report, reportService.GetOutputFileExtension());
         }
 
@@ -215,6 +216,7 @@ namespace Downloader.Service
 
             sw.Stop();
             logger.LogInformation("Download of {Total} targets completed in {Time}", total, sw.Elapsed);
+            timeToDownload = sw.Elapsed;
 
             return completed;
         }

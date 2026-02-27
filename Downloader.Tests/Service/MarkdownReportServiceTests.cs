@@ -37,7 +37,7 @@ namespace Downloader.Tests.Service
             IList<IDownloadTarget>? targets = null;
 
             // Act
-            var act = () => sut.GenerateReport(targets!);
+            var act = () => sut.GenerateReport(targets!, TimeSpan.FromMinutes(5));
 
             // Assert
             act.Should().Throw<ArgumentNullException>().WithParameterName("targets");
@@ -59,7 +59,7 @@ namespace Downloader.Tests.Service
             };
 
             // Act
-            string report = sut.GenerateReport(targets);
+            string report = sut.GenerateReport(targets, TimeSpan.FromMinutes(5));
 
             // Assert
             report.Should().Contain("# Download Report");
@@ -81,13 +81,13 @@ namespace Downloader.Tests.Service
                 "https://primary/link", "https://secondary/link-should-not-be-used", TimeSpan.FromMilliseconds(1234));
 
             // Act
-            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,}, TimeSpan.FromMinutes(5));
 
             // Assert
             report.Should().Contain("Downloaded using Primary");
             report.Should().Contain("file1.zip");
             report.Should().Contain("https://primary/link");
-            report.Should().Contain("1234 ms");
+            report.Should().Contain("1s 234ms");
             report.Should().NotContain("https://secondary/link-should-not-be-used");
         }
 
@@ -99,13 +99,13 @@ namespace Downloader.Tests.Service
                 "https://primary/link-should-not-be-used", "https://secondary/link", TimeSpan.FromMilliseconds(777));
 
             // Act
-            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,}, TimeSpan.FromMinutes(5));
 
             // Assert
             report.Should().Contain("Downloaded using Secondary");
             report.Should().Contain("file2.zip");
             report.Should().Contain("https://secondary/link");
-            report.Should().Contain("777 ms");
+            report.Should().Contain("777ms");
             report.Should().NotContain("https://primary/link-should-not-be-used");
         }
 
@@ -119,7 +119,7 @@ namespace Downloader.Tests.Service
                 null, TimeSpan.FromMilliseconds(10));
 
             // Act
-            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,}, TimeSpan.FromMinutes(5));
 
             // Assert
             report.Should().Contain("<missing link>");
@@ -134,7 +134,7 @@ namespace Downloader.Tests.Service
                 "https://primary/link", null, null);
 
             // Act
-            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,}, TimeSpan.FromMinutes(5));
 
             // Assert
             report.Should().Contain("unknown");

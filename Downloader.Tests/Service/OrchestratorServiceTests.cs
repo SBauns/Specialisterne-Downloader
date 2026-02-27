@@ -45,7 +45,7 @@ namespace Downloader.Tests.Service
 
             // Assert
             downloadServiceMock.Verify(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()), Times.Never);
-            reportServiceMock.Verify(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>()), Times.Never);
+            reportServiceMock.Verify(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>(), It.IsAny<TimeSpan?>()), Times.Never);
             fileServiceMock.Verify(fs => fs.ExportReport(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
         }
 
@@ -177,7 +177,7 @@ namespace Downloader.Tests.Service
 
         private void GivenReportOutputs(string report, string extension)
         {
-            reportServiceMock.Setup(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>())).Returns(report);
+            reportServiceMock.Setup(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>(), It.IsAny<TimeSpan?>())).Returns(report);
             reportServiceMock.Setup(rs => rs.GetOutputFileExtension()).Returns(extension);
         }
 
@@ -190,8 +190,8 @@ namespace Downloader.Tests.Service
         {
             var capture = new ReportTargetsCapture();
 
-            reportServiceMock.Setup(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>()))
-                .Callback<IList<IDownloadTarget>>(list => capture.Value = list).Returns(report);
+            reportServiceMock.Setup(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>(), It.IsAny<TimeSpan?>()))
+                .Callback<IList<IDownloadTarget>, TimeSpan?>((list, _) => capture.Value = list).Returns(report);
 
             reportServiceMock.Setup(rs => rs.GetOutputFileExtension()).Returns(extension);
 
@@ -211,7 +211,7 @@ namespace Downloader.Tests.Service
 
         private void ThenReportWasGeneratedOnce()
         {
-            reportServiceMock.Verify(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>()), Times.Once);
+            reportServiceMock.Verify(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>(), It.IsAny<TimeSpan?>()), Times.Once);
         }
 
         private void ThenReportWasExported(string content, string extension)

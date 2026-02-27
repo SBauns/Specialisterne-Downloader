@@ -22,7 +22,7 @@ namespace Downloader.Service
         }
 
         /// <inheritdoc />
-        public string GenerateReport(IList<IDownloadTarget> targets)
+        public string GenerateReport(IList<IDownloadTarget> targets, TimeSpan? timeSpentDownloading)
         {
             if (targets is null)
                 throw new ArgumentNullException(nameof(targets));
@@ -44,12 +44,20 @@ namespace Downloader.Service
 
             var builder = new MarkdownBuilder();
 
-            AddHeaderAndMetadata(builder, createdAtText, downloadExportPath);
+            AddHeaderAndMetadata(builder, createdAtText, downloadExportPath, timeSpentDownloading);
+            AddCountMetadata(builder, primary.Count, secondary.Count, none.Count);
             AddPrimarySection(builder, primary);
             AddSecondarySection(builder, secondary);
             AddNoneSection(builder, none);
 
             return builder.ToString();
+        }
+
+        private void AddCountMetadata(MarkdownBuilder builder, int primaryCount, int secondaryCount, int noneCount)
+        {
+            builder.AddParagraph($"Processed a total of {primaryCount + secondaryCount + noneCount}.")
+                .AddParagraph($"Of those, a total of {primaryCount + secondaryCount} files were downloaded.")
+                .AddParagraph($"Finally, {noneCount} failed to download for one reason or another.");
         }
 
         private (List<IDownloadTarget> Primary, List<IDownloadTarget> Secondary, List<IDownloadTarget> None)
@@ -78,10 +86,31 @@ namespace Downloader.Service
             return (primary, secondary, none);
         }
 
-        private void AddHeaderAndMetadata(MarkdownBuilder builder, string createdAtText, string downloadExportPath)
+        private void AddHeaderAndMetadata(
+            MarkdownBuilder builder, string createdAtText, string downloadExportPath, TimeSpan? timeSpentDownloading)
         {
+            var timeSpendParagraph = timeSpentDownloading.HasValue
+                ? $"In total it took {FormatDurationHumanReadable(timeSpentDownloading.Value)} to complete the download."
+                : "No time was spent downloading.";
+
             builder.AddHeader(1, "Download Report").AddParagraph($"Created: {createdAtText}")
-                .AddParagraph($"Downloaded files output path: `{downloadExportPath}`");
+                .AddParagraph($"Downloaded files output path: `{downloadExportPath}`").AddParagraph(timeSpendParagraph);
+        }
+
+        private string FormatDurationHumanReadable(TimeSpan time)
+        {
+            var parts = new List<string>();
+
+            if (time.Hours > 0)
+                parts.Add($"{time.Hours} {(time.Hours == 1 ? "hour" : "hours")}");
+
+            if (time.Minutes > 0)
+                parts.Add($"{time.Minutes} {(time.Minutes == 1 ? "minute" : "minutes")}");
+
+            // Always include seconds (even if 0)
+            parts.Add($"{time.Seconds} {(time.Seconds == 1 ? "second" : "seconds")}");
+
+            return string.Join(" ", parts);
         }
 
         private void AddPrimarySection(MarkdownBuilder builder, IList<IDownloadTarget> primary)
@@ -142,12 +171,11 @@ namespace Downloader.Service
 
             string fileName = Path.GetFileName(fullOutputFileName);
 
-            double? ms = timeToDownload?.TotalMilliseconds;
-            string msText = ms is null ? "unknown" : $"{ms.Value:0} ms";
+            string timeText = FormatElapsed(timeToDownload);
 
             string sizeText = FormatFileSize(fileSizeBytes);
 
-            return $"{msText,14} {sizeText,6} {fileName,-12}  {link}";
+            return $"{timeText,10} {sizeText,6} {fileName,-12}  {link}";
         }
 
         private string FormatFileSize(long bytes)
@@ -166,6 +194,22 @@ namespace Downloader.Service
                 return $"{bytes / (double) KB:0}KB";
 
             return $"{bytes}B";
+        }
+
+        private static string FormatElapsed(TimeSpan? time)
+        {
+            if (time is null)
+                return "unknown";
+
+            var t = time.Value;
+
+            if (t.TotalSeconds < 1)
+                return $"{t.TotalMilliseconds:0}ms";
+
+            if (t.TotalMinutes < 1)
+                return $"{t.Seconds}s {t.Milliseconds}ms";
+
+            return $"{(int) t.TotalMinutes}m {t.Seconds}s";
         }
 
         /// <inheritdoc />
