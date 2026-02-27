@@ -167,10 +167,15 @@ namespace Downloader.Service
         private async Task<IList<IDownloadTarget>> RunQueueWithLimit(
             Queue<Func<Task<IDownloadTarget>>> queue, int maxConcurrent)
         {
+            var total = queue.Count;
             var active = new List<Task<IDownloadTarget>>(Math.Min(maxConcurrent, queue.Count));
             var completed = new List<IDownloadTarget>();
 
             StartInitialBatch(queue, active, maxConcurrent);
+
+            logger.LogInformation(
+                "Download progress started. Completed: 0, Remaining: {Remaining}, Total: {Total}, MaxConcurrent: {MaxConcurrent}",
+                total, total, maxConcurrent);
 
             while (active.Count > 0)
             {
@@ -179,6 +184,13 @@ namespace Downloader.Service
 
                 // Fail-fast: exceptions bubbles up here
                 completed.Add(await finished);
+
+                var completedCount = completed.Count;
+                var remainingCount = total - completedCount;
+
+                logger.LogInformation(
+                    "Download progress. Completed: {Completed}, Remaining: {Remaining}", completedCount,
+                    remainingCount);
 
                 StartNextIfAvailable(queue, active);
             }
