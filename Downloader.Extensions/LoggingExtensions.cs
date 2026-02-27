@@ -14,14 +14,6 @@ namespace Downloader.Extensions
             return logger.BeginScope("Download: {Download}", target.OutputFileName) ?? NullScope.Instance;
         }
 
-        public static IDisposable BeginTargetScope(this ILogger logger, string outputFileName)
-        {
-            if (string.IsNullOrWhiteSpace(outputFileName))
-                throw new ArgumentException("OutputFileName must be set.", nameof(outputFileName));
-
-            return logger.BeginScope("Download: {Download}", outputFileName) ?? NullScope.Instance;
-        }
-
         private sealed class NullScope : IDisposable
         {
             public static readonly NullScope Instance = new();
