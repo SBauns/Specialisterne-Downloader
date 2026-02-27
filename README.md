@@ -170,10 +170,15 @@ Upper inclusive bound of targets to process.
 
 ## Notes
 
-- The application is currently Windows-focused due to use of `explorer.exe`.
+- The application is currently Windows only due to use of `explorer.exe`.
 
 ---
 
-## Roadmap
+## Future
 
-- Single-file self-contained release build  
+- Single-file self-contained release build.
+- Move targeted columns for input data to settings, to support changing the input columns.
+- Setup skipping retries, depending on the response gotten. 
+  - E.g 403, i.e Forbidden, wont change with a retry.
+- Configure `HttpClient` used more precisely.
+  - E.g to bypass sites rejecting the request due to suspected crawler / AI activty
