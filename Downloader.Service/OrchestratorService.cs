@@ -1,4 +1,5 @@
-﻿using Downloader.Abstraction.Interfaces.Model;
+﻿using System.Diagnostics;
+using Downloader.Abstraction.Interfaces.Model;
 using Downloader.Abstraction.Interfaces.Services;
 using Downloader.Model;
 using Microsoft.Extensions.Logging;
@@ -171,10 +172,16 @@ namespace Downloader.Service
             var active = new List<Task<IDownloadTarget>>(Math.Min(maxConcurrent, queue.Count));
             var completed = new List<IDownloadTarget>();
 
+            TimeSpan? estimatedRemaining = null;
+            TimeSpan? averageEstimatedRemaining = null;
+            long etaTicksSum = 0;
+            int etaSamples = 0;
+
+            var sw = Stopwatch.StartNew();
+
             StartInitialBatch(queue, active, maxConcurrent);
 
-            logger.LogInformation(
-                "Download progress started. Completed: 0, Remaining: {Remaining}, Total: {Total}, MaxConcurrent: {MaxConcurrent}",
+            logger.LogInformation("Download progress started. Completed: 0, Remaining: {Remaining}, Total: {Total}, MaxConcurrent: {MaxConcurrent}",
                 total, total, maxConcurrent);
 
             while (active.Count > 0)
@@ -188,14 +195,48 @@ namespace Downloader.Service
                 var completedCount = completed.Count;
                 var remainingCount = total - completedCount;
 
-                logger.LogInformation(
-                    "Download progress. Completed: {Completed}, Remaining: {Remaining}", completedCount,
-                    remainingCount);
+                if (completedCount > 0)
+                {
+                    estimatedRemaining = TimeSpan.FromTicks(sw.Elapsed.Ticks / completedCount * remainingCount);
+
+                    etaTicksSum += estimatedRemaining.Value.Ticks;
+                    etaSamples++;
+
+                    averageEstimatedRemaining = TimeSpan.FromTicks(etaTicksSum / etaSamples);
+                }
+
+                logger.LogInformation("Download progress. Completed: {Completed}, Remaining: {Remaining}", completedCount, remainingCount);
+                LogProgressBar(completedCount, total);
+                logger.LogInformation("Time so far: {Time}, Estimated Time Left: {Left}", sw.Elapsed,
+                    averageEstimatedRemaining.HasValue ? estimatedRemaining.ToString() : "Unknown");
 
                 StartNextIfAvailable(queue, active);
             }
 
+            sw.Stop();
+            logger.LogInformation("Download of {Total} targets completed in {Time}", total, sw.Elapsed);
+
             return completed;
+        }
+
+        private void LogProgressBar(int completed, int total, int barWidth = 30)
+        {
+            if (total <= 0)
+            {
+                logger.LogInformation("[{Bar}] {Percent}% ({Completed}/{Total})", new string('░', barWidth), 0,
+                    completed, total);
+
+                return;
+            }
+
+            var progress = (double) completed / total;
+            var filled = (int) Math.Round(progress * barWidth);
+
+            var bar = new string('█', filled) + new string('░', barWidth - filled);
+
+            var percent = Math.Round(progress * 100, 1);
+
+            logger.LogInformation("[{Bar}] {Percent}% ({Completed}/{Total})", bar, percent, completed, total);
         }
 
         private void StartInitialBatch(
