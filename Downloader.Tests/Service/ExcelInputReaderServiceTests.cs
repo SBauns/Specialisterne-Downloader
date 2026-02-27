@@ -1,5 +1,6 @@
 ﻿using ClosedXML.Excel;
 using Downloader.Abstraction.Enum;
+using Downloader.Abstraction.Interfaces.Model;
 using Downloader.Model;
 using Downloader.Service;
 using FluentAssertions;
@@ -31,7 +32,7 @@ namespace Downloader.Tests.Service
             });
 
             var sut = new ExcelInputReaderService(logger, options);
-            var missingPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid() + ".xlsx");
+            string missingPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, Guid.NewGuid() + ".xlsx");
 
             // Act
             Func<Task> act = async () => await sut.LoadTargets(missingPath);
@@ -46,7 +47,7 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_WhenSheetHasOnlyHeaderRow_ReturnsEmptyList()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws =>
+            string path = CreateTempExcelFile(ws =>
             {
                 ws.Cell(1, ExcelInputReaderService.OutputFileNameColumnIndex).Value = "OutputFileName";
                 ws.Cell(1, ExcelInputReaderService.PrimaryLinkColumnIndex).Value = "PrimaryLink";
@@ -73,7 +74,7 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_SkipsRowsWithNoTextContent()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws =>
+            string path = CreateTempExcelFile(ws =>
             {
                 // Header
                 ws.Cell(1, ExcelInputReaderService.OutputFileNameColumnIndex).Value = "OutputFileName";
@@ -109,7 +110,7 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_WhenRowHasContentButMissingOutputFileName_SkipsRow()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws =>
+            string path = CreateTempExcelFile(ws =>
             {
                 // Header
                 ws.Cell(1, ExcelInputReaderService.OutputFileNameColumnIndex).Value = "OutputFileName";
@@ -143,7 +144,7 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_MapsColumnsCorrectly_AndTrimsValues()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws =>
+            string path = CreateTempExcelFile(ws =>
             {
                 ws.Cell(1, ExcelInputReaderService.OutputFileNameColumnIndex).Value = "OutputFileName";
 
@@ -161,7 +162,7 @@ namespace Downloader.Tests.Service
             var sut = new ExcelInputReaderService(logger, options);
 
             // Act
-            var target = (await sut.LoadTargets(path)).Single();
+            IDownloadTarget target = (await sut.LoadTargets(path)).Single();
 
             // Assert
             target.OutputFileName.Should().Be("MyFile");
@@ -174,10 +175,8 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_WhenRangeIsNegative_ReturnsAllTargets()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws => WriteTargets(ws,
-                ("A", "pA", "sA"),
-                ("B", "pB", "sB"),
-                ("C", "pC", "sC")));
+            string path = CreateTempExcelFile(ws => WriteTargets(ws,
+                ("A", "pA", "sA"), ("B", "pB", "sB"), ("C", "pC", "sC")));
 
             var options = Options.Create(new DownloaderSettings
             {
@@ -199,12 +198,8 @@ namespace Downloader.Tests.Service
         {
             // Arrange
             // Targets read as index-based: 0=A,1=B,2=C,3=D,4=E
-            var path = CreateTempExcelFile(ws => WriteTargets(ws,
-                ("A", "pA", "sA"),
-                ("B", "pB", "sB"),
-                ("C", "pC", "sC"),
-                ("D", "pD", "sD"),
-                ("E", "pE", "sE")));
+            string path = CreateTempExcelFile(ws => WriteTargets(ws, ("A", "pA", "sA"), ("B", "pB", "sB"),
+                ("C", "pC", "sC"), ("D", "pD", "sD"), ("E", "pE", "sE")));
 
             var options = Options.Create(new DownloaderSettings
             {
@@ -225,10 +220,8 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_WhenEndIsBeforeStart_ReturnsEmpty()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws => WriteTargets(ws,
-                ("A", "pA", "sA"),
-                ("B", "pB", "sB"),
-                ("C", "pC", "sC")));
+            string path = CreateTempExcelFile(ws => WriteTargets(ws,
+                ("A", "pA", "sA"), ("B", "pB", "sB"), ("C", "pC", "sC")));
 
             var options = Options.Create(new DownloaderSettings
             {
@@ -249,15 +242,13 @@ namespace Downloader.Tests.Service
         public async Task LoadTargets_WhenRangeExceedsBounds_IsClamped()
         {
             // Arrange
-            var path = CreateTempExcelFile(ws => WriteTargets(ws,
-                ("A", "pA", "sA"),
-                ("B", "pB", "sB"),
-                ("C", "pC", "sC")));
+            string path = CreateTempExcelFile(ws => WriteTargets(ws,
+                ("A", "pA", "sA"), ("B", "pB", "sB"), ("C", "pC", "sC")));
 
             var options = Options.Create(new DownloaderSettings
             {
                 TargetStartIndex = -100, // clamps to 0
-                TargetEndIndex = 999,    // clamps to last
+                TargetEndIndex = 999, // clamps to last
             });
 
             var sut = new ExcelInputReaderService(logger, options);
@@ -273,13 +264,13 @@ namespace Downloader.Tests.Service
 
         private static string CreateTempExcelFile(Action<IXLWorksheet> configure)
         {
-            var tempDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "test-excels");
+            string tempDir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "test-excels");
             Directory.CreateDirectory(tempDir);
 
-            var path = Path.Combine(tempDir, $"{Guid.NewGuid():N}.xlsx");
+            string path = Path.Combine(tempDir, $"{Guid.NewGuid():N}.xlsx");
 
             using var wb = new XLWorkbook();
-            var ws = wb.AddWorksheet("Sheet1");
+            IXLWorksheet? ws = wb.AddWorksheet("Sheet1");
 
             configure(ws);
 
@@ -287,7 +278,8 @@ namespace Downloader.Tests.Service
             return path;
         }
 
-        private static void WriteTargets(IXLWorksheet ws, params (string output, string primary, string secondary)[] rows)
+        private static void WriteTargets(
+            IXLWorksheet ws, params (string output, string primary, string secondary)[] rows)
         {
             // Header row (service reads from row 2)
             ws.Cell(1, ExcelInputReaderService.OutputFileNameColumnIndex).Value = "OutputFileName";
@@ -295,7 +287,7 @@ namespace Downloader.Tests.Service
             ws.Cell(1, ExcelInputReaderService.SecondaryLinkColumnIndex).Value = "SecondaryLink";
 
             var rowNumber = 2;
-            foreach (var (output, primary, secondary) in rows)
+            foreach ((string output, string primary, string secondary) in rows)
             {
                 ws.Cell(rowNumber, ExcelInputReaderService.OutputFileNameColumnIndex).Value = output;
                 ws.Cell(rowNumber, ExcelInputReaderService.PrimaryLinkColumnIndex).Value = primary;

@@ -16,7 +16,9 @@ namespace Downloader.Service
         private readonly IHttpFileDownloaderService fileDownloaderService;
         private readonly IOptions<DownloaderSettings> options;
 
-        public DownloadService(ILogger<DownloadService> logger, IFileService fileService, IHttpFileDownloaderService fileDownloaderService, IOptions<DownloaderSettings> options)
+        public DownloadService(
+            ILogger<DownloadService> logger, IFileService fileService, IHttpFileDownloaderService fileDownloaderService,
+            IOptions<DownloaderSettings> options)
         {
             this.logger = logger;
             this.fileService = fileService;
@@ -27,10 +29,10 @@ namespace Downloader.Service
         /// <inheritdoc />
         public async Task<IDownloadTarget> DownloadContent(IDownloadTarget target)
         {
-            using var scope = logger.BeginTargetScope(target);
+            using IDisposable scope = logger.BeginTargetScope(target);
 
-            var maxDownloadRetries = options.Value.DownloadRetries;
-            var secondsBetweenRetries = options.Value.SecondsWaitBetweenRetry;
+            int maxDownloadRetries = options.Value.DownloadRetries;
+            int secondsBetweenRetries = options.Value.SecondsWaitBetweenRetry;
 
             logger.LogInformation("Starting download. Retries: {MaxRetries}, WaitBetweenRetriesSeconds: {WaitSeconds}",
                 maxDownloadRetries, secondsBetweenRetries);
@@ -53,20 +55,18 @@ namespace Downloader.Service
         }
 
         private async Task<bool> TryDownloadAndExport(
-    IDownloadTarget target,
-    string? link,
-    DownloadedUsing targetDownloadedUsing,
-    int maxDownloadRetries,
-    int secondsBetweenRetries)
+            IDownloadTarget target, string? link, DownloadedUsing targetDownloadedUsing, int maxDownloadRetries,
+            int secondsBetweenRetries)
         {
             if (string.IsNullOrWhiteSpace(link))
             {
-                logger.LogDebug("No {LinkLabel} link provided (empty). Treating as failure.", targetDownloadedUsing
-                    .ToString().ToTitleFromScreamingSnakeCase());
+                logger.LogDebug("No {LinkLabel} link provided (empty). Treating as failure.",
+                    targetDownloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
                 return false;
             }
 
-            var result = await TryDownloadWithRetries(link, targetDownloadedUsing, maxDownloadRetries, secondsBetweenRetries);
+            DownloadAttemptResult result = await TryDownloadWithRetries(link, targetDownloadedUsing, maxDownloadRetries,
+                secondsBetweenRetries);
             if (!result.Succeeded)
                 return false;
 
@@ -79,7 +79,7 @@ namespace Downloader.Service
                 await fileService.ExportDownloadedFile(target, result.FileStream!);
             }
 
-            var formattedTime = target.TimeToDownload is null
+            string formattedTime = target.TimeToDownload is null
                 ? "Unknown"
                 : target.TimeToDownload.Value.ToString(@"mm\:ss\.ff");
             logger.LogInformation(
@@ -100,7 +100,7 @@ namespace Downloader.Service
                 }
                 catch (Exception ex)
                 {
-                    var shouldRetry = await HandleFailedAttempt(ex, downloadedUsing, attempt, maxDownloadRetries,
+                    bool shouldRetry = await HandleFailedAttempt(ex, downloadedUsing, attempt, maxDownloadRetries,
                         secondsBetweenRetries);
 
                     if (!shouldRetry)
@@ -108,16 +108,18 @@ namespace Downloader.Service
                 }
             }
 
-            logger.LogDebug("All retries exhausted for {LinkLabel} link.", downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
+            logger.LogDebug("All retries exhausted for {LinkLabel} link.",
+                downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
             return DownloadAttemptResult.Failure();
         }
 
-        private async Task<DownloadAttemptResult> HandleSuccessfulAttempt(string link, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries)
+        private async Task<DownloadAttemptResult> HandleSuccessfulAttempt(
+            string link, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries)
         {
             logger.LogDebug("Attempting download ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
                 maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
 
-            var (stream, elapsed) = await fileDownloaderService.DownloadOnce(link);
+            (Stream stream, TimeSpan elapsed) = await fileDownloaderService.DownloadOnce(link);
 
             logger.LogInformation(
                 "Download attempt succeeded ({Attempt}/{Max}) using {LinkLabel} link. Elapsed: {Elapsed}", attempt,
@@ -127,7 +129,8 @@ namespace Downloader.Service
         }
 
         private async Task<bool> HandleFailedAttempt(
-            Exception ex, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries, int secondsBetweenRetries)
+            Exception ex, DownloadedUsing downloadedUsing, int attempt, int maxDownloadRetries,
+            int secondsBetweenRetries)
         {
             logger.LogTrace(ex, "Download attempt failed ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
                 maxDownloadRetries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
@@ -144,11 +147,21 @@ namespace Downloader.Service
             return true;
         }
 
-        private sealed record DownloadAttemptResult(bool Succeeded, Stream? FileStream, TimeSpan? TimeToDownload,
+        private sealed record DownloadAttemptResult(
+            bool Succeeded,
+            Stream? FileStream,
+            TimeSpan? TimeToDownload,
             DownloadedUsing DownloadedUsing)
         {
-            public static DownloadAttemptResult Success(Stream stream, TimeSpan elapsed, DownloadedUsing linkLabel) => new(true, stream, elapsed, linkLabel);
-            public static DownloadAttemptResult Failure() => new(false, null, null, DownloadedUsing.NONE);
+            public static DownloadAttemptResult Success(Stream stream, TimeSpan elapsed, DownloadedUsing linkLabel)
+            {
+                return new DownloadAttemptResult(true, stream, elapsed, linkLabel);
+            }
+
+            public static DownloadAttemptResult Failure()
+            {
+                return new DownloadAttemptResult(false, null, null, DownloadedUsing.NONE);
+            }
         }
     }
 }

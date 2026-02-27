@@ -29,13 +29,13 @@ namespace Downloader.Service
         /// <inheritdoc />
         public Task<IList<IDownloadTarget>> LoadTargets(string sourceFile)
         {
-            var lowerBound = options.Value.TargetStartIndex;
-            var upperBound = options.Value.TargetEndIndex;
+            int lowerBound = options.Value.TargetStartIndex;
+            int upperBound = options.Value.TargetEndIndex;
 
-            var path = ValidateExcelPath(sourceFile);
+            string path = ValidateExcelPath(sourceFile);
 
-            using var workbook = OpenWorkbook(path);
-            var worksheet = GetWorksheet(workbook);
+            using XLWorkbook workbook = OpenWorkbook(path);
+            IXLWorksheet worksheet = GetWorksheet(workbook);
 
             var targets = ReadTargetsFromWorksheet(worksheet);
             var filteredTargets = ApplyTargetRange(targets, lowerBound, upperBound);
@@ -48,8 +48,8 @@ namespace Downloader.Service
             if (targets.Count == 0)
                 return targets;
 
-            var start = lowerBound < 0 ? 0 : lowerBound;
-            var end = upperBound < 0 ? targets.Count - 1 : upperBound;
+            int start = lowerBound < 0 ? 0 : lowerBound;
+            int end = upperBound < 0 ? targets.Count - 1 : upperBound;
 
             if (end < start)
             {
@@ -64,7 +64,7 @@ namespace Downloader.Service
             start = Math.Clamp(start, 0, targets.Count - 1);
             end = Math.Clamp(end, 0, targets.Count - 1);
 
-            var count = end - start + 1;
+            int count = end - start + 1;
 
             logger.LogInformation(
                 "Applying target range. Requested: [{RequestedStart}..{RequestedEnd}] -> Applied: [{AppliedStart}..{AppliedEnd}] Count: {Count} out of {Total}.",
@@ -75,19 +75,24 @@ namespace Downloader.Service
 
         private string ValidateExcelPath(string sourceFile)
         {
-            return !File.Exists(sourceFile) ? throw new FileNotFoundException($"Excel input file not found: {sourceFile}",
-                sourceFile) : sourceFile;
+            return !File.Exists(sourceFile)
+                ? throw new FileNotFoundException($"Excel input file not found: {sourceFile}", sourceFile)
+                : sourceFile;
         }
 
         private XLWorkbook OpenWorkbook(string path)
-            => new XLWorkbook(path);
+        {
+            return new XLWorkbook(path);
+        }
 
         private IXLWorksheet GetWorksheet(XLWorkbook workbook)
-            => workbook.Worksheets.First();
+        {
+            return workbook.Worksheets.First();
+        }
 
         private List<IDownloadTarget> ReadTargetsFromWorksheet(IXLWorksheet worksheet)
         {
-            var lastRow = GetLastUsedRowNumber(worksheet);
+            int lastRow = GetLastUsedRowNumber(worksheet);
 
             if (lastRow < 2)
             {
@@ -95,17 +100,17 @@ namespace Downloader.Service
                 return new List<IDownloadTarget>();
             }
 
-            var lastColumn = GetLastUsedColumnNumber(worksheet);
+            int lastColumn = GetLastUsedColumnNumber(worksheet);
             var targets = new List<IDownloadTarget>();
 
             for (var rowNumber = 2; rowNumber <= lastRow; rowNumber++)
             {
-                var row = worksheet.Row(rowNumber);
+                IXLRow row = worksheet.Row(rowNumber);
 
                 if (!RowHasAnyTextContent(row, lastColumn))
                     continue;
 
-                if (!TryCreateTargetFromRow(row, rowNumber, out var target))
+                if (!TryCreateTargetFromRow(row, rowNumber, out IDownloadTarget target))
                     continue;
 
                 targets.Add(target);
@@ -115,10 +120,14 @@ namespace Downloader.Service
         }
 
         private int GetLastUsedRowNumber(IXLWorksheet worksheet)
-            => worksheet.LastRowUsed()?.RowNumber() ?? 0;
+        {
+            return worksheet.LastRowUsed()?.RowNumber() ?? 0;
+        }
 
         private int GetLastUsedColumnNumber(IXLWorksheet worksheet)
-            => worksheet.LastColumnUsed()?.ColumnNumber() ?? 1;
+        {
+            return worksheet.LastColumnUsed()?.ColumnNumber() ?? 1;
+        }
 
         /// <summary>
         /// Treat row as "having content" if ANY cell contains non-whitespace text.
@@ -134,14 +143,13 @@ namespace Downloader.Service
 
         private bool TryCreateTargetFromRow(IXLRow row, int rowNumber, out IDownloadTarget target)
         {
-            var outputFileName = GetCellTrimmedOrEmpty(row, COL_OUTPUT_FILE_NAME);
-            var primaryLink = GetCellTrimmedOrEmpty(row, COL_PRIMARY_LINK);
-            var secondaryLink = GetCellTrimmedOrEmpty(row, COL_SECONDARY_LINK);
+            string outputFileName = GetCellTrimmedOrEmpty(row, COL_OUTPUT_FILE_NAME);
+            string primaryLink = GetCellTrimmedOrEmpty(row, COL_PRIMARY_LINK);
+            string secondaryLink = GetCellTrimmedOrEmpty(row, COL_SECONDARY_LINK);
 
             if (string.IsNullOrWhiteSpace(outputFileName))
             {
-                logger.LogWarning(
-                    "Row {RowNumber} has data but cell A ({OutputFileName}) is empty. Skipping row.",
+                logger.LogWarning("Row {RowNumber} has data but cell A ({OutputFileName}) is empty. Skipping row.",
                     rowNumber, nameof(IDownloadTarget.OutputFileName));
 
                 target = null!;
@@ -160,6 +168,8 @@ namespace Downloader.Service
         }
 
         private string GetCellTrimmedOrEmpty(IXLRow row, int columnNumber)
-            => row.Cell(columnNumber).GetString()?.Trim() ?? string.Empty;
+        {
+            return row.Cell(columnNumber).GetString()?.Trim() ?? string.Empty;
+        }
     }
 }

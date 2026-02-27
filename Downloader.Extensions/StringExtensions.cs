@@ -7,11 +7,11 @@
             if (string.IsNullOrWhiteSpace(value))
                 return string.Empty;
 
-            var parts = value.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            string[] parts = value.Split('_', StringSplitOptions.RemoveEmptyEntries);
 
             var result = parts.Select(p =>
             {
-                var lower = p.ToLowerInvariant();
+                string lower = p.ToLowerInvariant();
                 return char.ToUpperInvariant(lower[0]) + lower[1..];
             });
 

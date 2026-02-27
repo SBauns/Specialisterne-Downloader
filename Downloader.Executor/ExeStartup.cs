@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http;
+
 // Reduces readability in multiple location in this file, if done.
 // ReSharper disable ConvertIfStatementToReturnStatement
 
@@ -25,7 +26,7 @@ namespace Downloader.Executor
         {
             AddModule(new LoggingStartupModule(GetApplicationDataPath()));
 
-            defaultDownloaderSettings = new DownloaderSettings()
+            defaultDownloaderSettings = new DownloaderSettings
             {
                 DownloadedFilesOutputPath = Path.Combine(GetApplicationDataPath(), "Downloads"),
                 ReportsOutputPath = Path.Combine(GetApplicationDataPath(), "Reports"),
@@ -45,9 +46,10 @@ namespace Downloader.Executor
                 .ConfigureServices(SetupServices).Build();
         }
 
-        private void ConfigureAppConfiguration(HostBuilderContext hostBuilderContext, IConfigurationBuilder configurationBuilder)
+        private void ConfigureAppConfiguration(
+            HostBuilderContext hostBuilderContext, IConfigurationBuilder configurationBuilder)
         {
-            var appSettingsPath = Path.Combine(GetApplicationDataPath(), "appsettings.json");
+            string appSettingsPath = Path.Combine(GetApplicationDataPath(), "appsettings.json");
 
             EnsureAndNormalizeAppSettings(appSettingsPath);
 
@@ -56,17 +58,17 @@ namespace Downloader.Executor
 
         private void EnsureAndNormalizeAppSettings(string appSettingsPath)
         {
-            var directory = Path.GetDirectoryName(appSettingsPath) ??
-                            throw new InvalidOperationException(
-                                $"Could not determine directory for '{appSettingsPath}'.");
+            string directory = Path.GetDirectoryName(appSettingsPath) ??
+                               throw new InvalidOperationException(
+                                   $"Could not determine directory for '{appSettingsPath}'.");
 
             Directory.CreateDirectory(directory);
 
-            var rootObj = LoadOrCreateRootObject(appSettingsPath, out var createdNewFile);
+            JsonObject rootObj = LoadOrCreateRootObject(appSettingsPath, out bool createdNewFile);
 
-            var changed = createdNewFile;
+            bool changed = createdNewFile;
 
-            var downloaderObj = EnsureDownloaderSection(rootObj, ref changed);
+            JsonObject downloaderObj = EnsureDownloaderSection(rootObj, ref changed);
             changed |= NormalizeDownloaderBounds(downloaderObj);
 
             if (changed)
@@ -85,8 +87,8 @@ namespace Downloader.Executor
 
             try
             {
-                var jsonText = File.ReadAllText(appSettingsPath);
-                var node = JsonNode.Parse(jsonText);
+                string jsonText = File.ReadAllText(appSettingsPath);
+                JsonNode? node = JsonNode.Parse(jsonText);
 
                 if (node is JsonObject obj)
                     return obj;
@@ -107,7 +109,7 @@ namespace Downloader.Executor
         {
             return new JsonObject
             {
-                ["Downloader"] = JsonSerializer.SerializeToNode(defaultDownloaderSettings)
+                ["Downloader"] = JsonSerializer.SerializeToNode(defaultDownloaderSettings),
             };
         }
 
@@ -116,8 +118,7 @@ namespace Downloader.Executor
             if (rootObj["Downloader"] is JsonObject downloaderObj)
                 return downloaderObj;
 
-            downloaderObj = JsonSerializer.SerializeToNode(defaultDownloaderSettings) as JsonObject
-                            ?? new JsonObject();
+            downloaderObj = JsonSerializer.SerializeToNode(defaultDownloaderSettings) as JsonObject ?? new JsonObject();
 
             rootObj["Downloader"] = downloaderObj;
             changed = true;
@@ -129,13 +130,9 @@ namespace Downloader.Executor
         {
             var changed = false;
 
-            changed |= NormalizeIntMinMinusOne(
-                downloaderObj,
-                nameof(DownloaderSettings.TargetStartIndex));
+            changed |= NormalizeIntMinMinusOne(downloaderObj, nameof(DownloaderSettings.TargetStartIndex));
 
-            changed |= NormalizeIntMinMinusOne(
-                downloaderObj,
-                nameof(DownloaderSettings.TargetEndIndex));
+            changed |= NormalizeIntMinMinusOne(downloaderObj, nameof(DownloaderSettings.TargetEndIndex));
 
             return changed;
         }
@@ -148,7 +145,7 @@ namespace Downloader.Executor
             if (section[propertyName] is not JsonValue val)
                 return false;
 
-            if (!val.TryGetValue<int>(out var current))
+            if (!val.TryGetValue<int>(out int current))
                 return false;
 
             if (current >= -1)
@@ -160,11 +157,11 @@ namespace Downloader.Executor
 
         private void WriteAppSettings(string appSettingsPath, JsonObject rootObj)
         {
-            var json = rootObj.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+            string json = rootObj.ToJsonString(new JsonSerializerOptions {WriteIndented = true,});
 
-            var tmpPath = appSettingsPath + ".tmp";
+            string tmpPath = appSettingsPath + ".tmp";
             File.WriteAllText(tmpPath, json);
-            File.Copy(tmpPath, appSettingsPath, overwrite: true);
+            File.Copy(tmpPath, appSettingsPath, true);
             File.Delete(tmpPath);
         }
 
@@ -174,8 +171,8 @@ namespace Downloader.Executor
         {
             base.ConfigureServices(hostBuilderContext, services);
 
-            services.AddOptions<DownloaderSettings>().Bind(
-                hostBuilderContext.Configuration.GetSection(SETTINGS_SECTIONS))
+            services.AddOptions<DownloaderSettings>()
+                .Bind(hostBuilderContext.Configuration.GetSection(SETTINGS_SECTIONS))
                 .Validate(ValidateDownloaderSettings).ValidateOnStart();
 
             services.AddScoped<IOrchestratorService, OrchestratorService>();
@@ -191,7 +188,7 @@ namespace Downloader.Executor
             if (settings is null)
                 return false;
 
-            if (!ValidateStringSettings(settings)) 
+            if (!ValidateStringSettings(settings))
                 return false;
 
             if (!ValidateIntegerSettings(settings))

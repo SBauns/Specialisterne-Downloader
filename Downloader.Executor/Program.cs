@@ -6,6 +6,9 @@ using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using Downloader.Executor.Startup.Modules;
 
+// ReSharper disable InvertIf
+// ReSharper disable MemberCanBeMadeStatic.Local
+
 namespace Downloader.Executor
 {
     internal class Program : IAsyncDisposable
@@ -27,7 +30,7 @@ namespace Downloader.Executor
             orchestrator = scope.ServiceProvider.GetRequiredService<IOrchestratorService>();
         }
 
-        static async Task Main(string[] args)
+        private static async Task Main(string[] args)
         {
             var program = new Program(args);
 
@@ -48,7 +51,7 @@ namespace Downloader.Executor
                 PrintMenu();
 
                 Console.Write("> ");
-                var input = Console.ReadLine();
+                string? input = Console.ReadLine();
 
                 if (string.IsNullOrWhiteSpace(input))
                 {
@@ -56,7 +59,7 @@ namespace Downloader.Executor
                     continue;
                 }
 
-                var handled = await HandleCommand(input.Trim());
+                bool handled = await HandleCommand(input.Trim());
 
                 if (!handled)
                 {
@@ -69,8 +72,7 @@ namespace Downloader.Executor
             }
         }
 
-        private async Task<bool> HandleCommand(
-            string command)
+        private async Task<bool> HandleCommand(string command)
         {
             if (command.Equals("reports", StringComparison.InvariantCultureIgnoreCase))
             {
@@ -98,7 +100,7 @@ namespace Downloader.Executor
 
             if (command.Equals("input", StringComparison.InvariantCultureIgnoreCase))
             {
-                var folder = GetFolderFromFilePath(options.FilesToDownloadExcelInput);
+                string folder = GetFolderFromFilePath(options.FilesToDownloadExcelInput);
                 OpenFolder(folder);
                 return true;
             }
@@ -123,7 +125,7 @@ namespace Downloader.Executor
             {
                 FileName = "explorer.exe",
                 Arguments = $"\"{folderPath}\"",
-                UseShellExecute = true
+                UseShellExecute = true,
             });
         }
 
@@ -132,7 +134,7 @@ namespace Downloader.Executor
             if (string.IsNullOrWhiteSpace(filePath))
                 return Environment.CurrentDirectory;
 
-            var fullPath = Path.GetFullPath(filePath);
+            string fullPath = Path.GetFullPath(filePath);
             return Path.GetDirectoryName(fullPath) ?? Environment.CurrentDirectory;
         }
 

@@ -33,21 +33,19 @@ namespace Downloader.Tests.Service
         public async Task DownloadContent_WhenPrimarySucceeds_DoesNotTrySecondary_ExportsAndSetsTarget()
         {
             // Arrange
-            var targetMock = CreateTarget(primary: "https://primary", secondary: "https://secondary");
-            var target = targetMock.Object;
+            var targetMock = CreateTarget("https://primary", "https://secondary");
+            IDownloadTarget target = targetMock.Object;
 
-            using var stream = new MemoryStream(new byte[] { 1, 2, 3 });
-            var elapsed = TimeSpan.FromMilliseconds(123);
+            using var stream = new MemoryStream(new byte[] {1, 2, 3,});
+            TimeSpan elapsed = TimeSpan.FromMilliseconds(123);
 
-            httpDownloaderMock
-                .Setup(d => d.DownloadOnce("https://primary"))
-                .ReturnsAsync((stream, elapsed));
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary")).ReturnsAsync((stream, elapsed));
 
-            var options = CreateOptions(downloadRetries: 3, secondsBetweenRetries: 0);
+            var options = CreateOptions(3, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
 
             // Act
-            var result = await sut.DownloadContent(target);
+            IDownloadTarget result = await sut.DownloadContent(target);
 
             // Assert
             result.Should().BeSameAs(target);
@@ -64,21 +62,19 @@ namespace Downloader.Tests.Service
         public async Task DownloadContent_WhenPrimaryLinkMissing_FallsBackToSecondary()
         {
             // Arrange
-            var targetMock = CreateTarget(primary: "   ", secondary: "https://secondary");
-            var target = targetMock.Object;
+            var targetMock = CreateTarget("   ", "https://secondary");
+            IDownloadTarget target = targetMock.Object;
 
-            using var stream = new MemoryStream(new byte[] { 9 });
-            var elapsed = TimeSpan.FromMilliseconds(50);
+            using var stream = new MemoryStream(new byte[] {9,});
+            TimeSpan elapsed = TimeSpan.FromMilliseconds(50);
 
-            httpDownloaderMock
-                .Setup(d => d.DownloadOnce("https://secondary"))
-                .ReturnsAsync((stream, elapsed));
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://secondary")).ReturnsAsync((stream, elapsed));
 
-            var options = CreateOptions(downloadRetries: 3, secondsBetweenRetries: 0);
+            var options = CreateOptions(3, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
 
             // Act
-            var result = await sut.DownloadContent(target);
+            IDownloadTarget result = await sut.DownloadContent(target);
 
             // Assert
             result.Should().BeSameAs(target);
@@ -95,25 +91,23 @@ namespace Downloader.Tests.Service
         public async Task DownloadContent_WhenPrimaryFailsAfterRetries_ThenSecondarySucceeds_UsesSecondary()
         {
             // Arrange
-            var targetMock = CreateTarget(primary: "https://primary", secondary: "https://secondary");
-            var target = targetMock.Object;
+            var targetMock = CreateTarget("https://primary", "https://secondary");
+            IDownloadTarget target = targetMock.Object;
 
-            httpDownloaderMock
-                .Setup(d => d.DownloadOnce("https://primary"))
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary"))
                 .ThrowsAsync(new HttpRequestException("fail"));
 
-            using var secondaryStream = new MemoryStream(new byte[] { 7, 7 });
-            var secondaryElapsed = TimeSpan.FromMilliseconds(222);
+            using var secondaryStream = new MemoryStream(new byte[] {7, 7,});
+            TimeSpan secondaryElapsed = TimeSpan.FromMilliseconds(222);
 
-            httpDownloaderMock
-                .Setup(d => d.DownloadOnce("https://secondary"))
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://secondary"))
                 .ReturnsAsync((secondaryStream, secondaryElapsed));
 
-            var options = CreateOptions(downloadRetries: 3, secondsBetweenRetries: 0);
+            var options = CreateOptions(3, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
 
             // Act
-            var result = await sut.DownloadContent(target);
+            IDownloadTarget result = await sut.DownloadContent(target);
 
             // Assert
             result.Should().BeSameAs(target);
@@ -130,18 +124,17 @@ namespace Downloader.Tests.Service
         public async Task DownloadContent_WhenBothPrimaryAndSecondaryFail_SetsNoneAndDoesNotExport()
         {
             // Arrange
-            var targetMock = CreateTarget(primary: "https://primary", secondary: "https://secondary");
-            var target = targetMock.Object;
+            var targetMock = CreateTarget("https://primary", "https://secondary");
+            IDownloadTarget target = targetMock.Object;
 
-            httpDownloaderMock
-                .Setup(d => d.DownloadOnce(It.IsAny<string>()))
+            httpDownloaderMock.Setup(d => d.DownloadOnce(It.IsAny<string>()))
                 .ThrowsAsync(new HttpRequestException("fail"));
 
-            var options = CreateOptions(downloadRetries: 2, secondsBetweenRetries: 0);
+            var options = CreateOptions(2, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
 
             // Act
-            var result = await sut.DownloadContent(target);
+            IDownloadTarget result = await sut.DownloadContent(target);
 
             // Assert
             result.Should().BeSameAs(target);
@@ -151,34 +144,32 @@ namespace Downloader.Tests.Service
             httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(2));
             httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Exactly(2));
 
-            fileServiceMock.Verify(fs => fs.ExportDownloadedFile(It.IsAny<IDownloadTarget>(), It.IsAny<Stream>()), Times.Never);
+            fileServiceMock.Verify(fs => fs.ExportDownloadedFile(It.IsAny<IDownloadTarget>(), It.IsAny<Stream>()),
+                Times.Never);
         }
 
         [Test]
         public void DownloadContent_WhenExportThrows_PropagatesException_AndDisposesDownloadedStream()
         {
             // Arrange
-            var targetMock = CreateTarget(primary: "https://primary", secondary: "https://secondary");
-            var target = targetMock.Object;
+            var targetMock = CreateTarget("https://primary", "https://secondary");
+            IDownloadTarget target = targetMock.Object;
 
-            var disposableStream = new TrackingStream(new byte[] { 1, 2, 3 });
-            httpDownloaderMock
-                .Setup(d => d.DownloadOnce("https://primary"))
+            var disposableStream = new TrackingStream(new byte[] {1, 2, 3,});
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary"))
                 .ReturnsAsync((disposableStream, TimeSpan.FromMilliseconds(1)));
 
-            fileServiceMock
-                .Setup(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()))
+            fileServiceMock.Setup(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()))
                 .ThrowsAsync(new InvalidOperationException("export failed"));
 
-            var options = CreateOptions(downloadRetries: 1, secondsBetweenRetries: 0);
+            var options = CreateOptions(1, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
 
             // Act
             Func<Task> act = async () => await sut.DownloadContent(target);
 
             // Assert
-            act.Should().ThrowAsync<InvalidOperationException>()
-                .WithMessage("export failed");
+            act.Should().ThrowAsync<InvalidOperationException>().WithMessage("export failed");
 
             disposableStream.WasDisposed.Should().BeTrue("DownloadService wraps the stream in await using");
         }
@@ -186,11 +177,13 @@ namespace Downloader.Tests.Service
         // ---------------- Helpers ----------------
 
         private static IOptions<DownloaderSettings> CreateOptions(int downloadRetries, int secondsBetweenRetries)
-            => Options.Create(new DownloaderSettings
+        {
+            return Options.Create(new DownloaderSettings
             {
                 DownloadRetries = downloadRetries,
-                SecondsWaitBetweenRetry = secondsBetweenRetries
+                SecondsWaitBetweenRetry = secondsBetweenRetries,
             });
+        }
 
         private static Mock<IDownloadTarget> CreateTarget(string? primary, string? secondary)
         {
@@ -204,7 +197,7 @@ namespace Downloader.Tests.Service
 
             // Service sets these
             mock.SetupProperty(t => t.DownloadedUsing, DownloadedUsing.NONE);
-            mock.SetupProperty(t => t.TimeToDownload, (TimeSpan?)null);
+            mock.SetupProperty(t => t.TimeToDownload, (TimeSpan?) null);
 
             return mock;
         }
@@ -213,7 +206,9 @@ namespace Downloader.Tests.Service
         {
             public bool WasDisposed { get; private set; }
 
-            public TrackingStream(byte[] buffer) : base(buffer) { }
+            public TrackingStream(byte[] buffer) : base(buffer)
+            {
+            }
 
             protected override void Dispose(bool disposing)
             {

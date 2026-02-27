@@ -27,23 +27,20 @@ namespace Downloader.Service
             if (targets is null)
                 throw new ArgumentNullException(nameof(targets));
 
-            var downloadExportPath = options.Value.DownloadedFilesOutputPath;
+            string downloadExportPath = options.Value.DownloadedFilesOutputPath;
 
-            var createdAt = DateTime.Now;
+            DateTime createdAt = DateTime.Now;
             var createdAtText = createdAt.ToString("dd MMM yyyy HH:mm", CultureInfo.InvariantCulture);
 
             logger.LogInformation(
                 "Generating markdown report. Targets: {TargetCount}, DownloadExportPath: {DownloadExportPath}",
-                targets.Count,
-                downloadExportPath);
+                targets.Count, downloadExportPath);
 
             var (primary, secondary, none) = SplitTargets(targets);
 
             logger.LogDebug(
                 "Report target groups. Primary: {PrimaryCount}, Secondary: {SecondaryCount}, None: {NoneCount}",
-                primary.Count,
-                secondary.Count,
-                none.Count);
+                primary.Count, secondary.Count, none.Count);
 
             var builder = new MarkdownBuilder();
 
@@ -62,7 +59,7 @@ namespace Downloader.Service
             var secondary = new List<IDownloadTarget>();
             var none = new List<IDownloadTarget>();
 
-            foreach (var t in targets)
+            foreach (IDownloadTarget t in targets)
             {
                 switch (t.DownloadedUsing)
                 {
@@ -83,9 +80,7 @@ namespace Downloader.Service
 
         private void AddHeaderAndMetadata(MarkdownBuilder builder, string createdAtText, string downloadExportPath)
         {
-            builder
-                .AddHeader(1, "Download Report")
-                .AddParagraph($"Created: {createdAtText}")
+            builder.AddHeader(1, "Download Report").AddParagraph($"Created: {createdAtText}")
                 .AddParagraph($"Downloaded files output path: `{downloadExportPath}`");
         }
 
@@ -95,32 +90,27 @@ namespace Downloader.Service
 
             builder.AddUnorderedList(ul =>
             {
-                foreach (var t in primary)
+                foreach (IDownloadTarget t in primary)
                 {
-                    var line = FormatSuccessLine(
-                        link: t.PrimaryLink,
-                        fullOutputFileName: t.FullOutputFileName!,
-                        timeToDownload: t.TimeToDownload);
+                    string line = FormatSuccessLine(t.PrimaryLink, t.FullOutputFileName!, t.TimeToDownload);
 
-                    ul.AddTaskListItem(line, isChecked: true);
+                    ul.AddTaskListItem(line, true);
                 }
             });
         }
 
         private void AddSecondarySection(MarkdownBuilder builder, IList<IDownloadTarget> secondary)
         {
-            builder.AddHeader(2, $"Downloaded using {nameof(DownloadedUsing.SECONDARY).ToTitleFromScreamingSnakeCase()}");
+            builder.AddHeader(2,
+                $"Downloaded using {nameof(DownloadedUsing.SECONDARY).ToTitleFromScreamingSnakeCase()}");
 
             builder.AddUnorderedList(ul =>
             {
-                foreach (var t in secondary)
+                foreach (IDownloadTarget t in secondary)
                 {
-                    var line = FormatSuccessLine(
-                        link: t.SecondaryLink,
-                        fullOutputFileName: t.FullOutputFileName!,
-                        timeToDownload: t.TimeToDownload);
+                    string line = FormatSuccessLine(t.SecondaryLink, t.FullOutputFileName!, t.TimeToDownload);
 
-                    ul.AddTaskListItem(line, isChecked: true);
+                    ul.AddTaskListItem(line, true);
                 }
             });
         }
@@ -131,10 +121,8 @@ namespace Downloader.Service
 
             builder.AddUnorderedList(ul =>
             {
-                foreach (var t in none)
-                {
-                    ul.AddTaskListItem(t.OutputFileName, isChecked: false);
-                }
+                foreach (IDownloadTarget t in none)
+                    ul.AddTaskListItem(t.OutputFileName, false);
             });
         }
 
@@ -143,11 +131,11 @@ namespace Downloader.Service
             if (string.IsNullOrWhiteSpace(link))
                 link = "<missing link>";
 
-            var fileName = Path.GetFileName(fullOutputFileName);
+            string fileName = Path.GetFileName(fullOutputFileName);
 
-            var ms = timeToDownload?.TotalMilliseconds;
+            double? ms = timeToDownload?.TotalMilliseconds;
 
-            var msText = ms is null ? "unknown" : $"{ms.Value:0} ms";
+            string msText = ms is null ? "unknown" : $"{ms.Value:0} ms";
 
             return $"{msText,8}  {fileName,-12}  {link}";
         }

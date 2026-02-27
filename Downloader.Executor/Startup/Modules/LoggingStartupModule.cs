@@ -27,7 +27,7 @@ namespace Downloader.Executor.Startup.Modules
             level = LogEventLevel.Debug;
 #endif
 
-            var configuration = new LoggerConfiguration().Enrich.FromLogContext();
+            LoggerConfiguration configuration = new LoggerConfiguration().Enrich.FromLogContext();
             configuration = AddWriteToSegments(configuration);
             configuration = ConfigureMinimumLevel(configuration);
             configuration = AddLevelOverwrites(configuration);
@@ -58,12 +58,12 @@ namespace Downloader.Executor.Startup.Modules
             level = LogEventLevel.Debug;
 #endif
 
-            var logPath = Path.Combine(LogDirectory, "log-.log");
+            string logPath = Path.Combine(LogDirectory, "log-.log");
 
             configuration = configuration.WriteTo.Console(outputTemplate: LOG_PATTERN);
             configuration = configuration.WriteTo.File(logPath, outputTemplate: LOG_PATTERN, shared: true,
-                flushToDiskInterval: TimeSpan.FromMinutes(1), restrictedToMinimumLevel: level, retainedFileCountLimit: 7,
-                rollingInterval: RollingInterval.Day);
+                flushToDiskInterval: TimeSpan.FromMinutes(1), restrictedToMinimumLevel: level,
+                retainedFileCountLimit: 7, rollingInterval: RollingInterval.Day);
 
             return configuration;
         }
@@ -71,7 +71,8 @@ namespace Downloader.Executor.Startup.Modules
         private LoggerConfiguration AddLevelOverwrites(LoggerConfiguration configuration)
         {
             configuration = configuration.MinimumLevel.Override("Microsoft", LogEventLevel.Warning);
-            configuration = configuration.MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Information);
+            configuration =
+                configuration.MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Information);
 
             configuration = configuration.MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning);
             configuration = configuration.MinimumLevel.Override("Microsoft.Extensions.Http", LogEventLevel.Warning);

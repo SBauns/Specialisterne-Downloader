@@ -22,12 +22,10 @@ namespace Downloader.Tests.Service
             logger = Mock.Of<ILogger<MarkdownReportService>>();
 
             optionsMock = new Mock<IOptions<DownloaderSettings>>();
-            optionsMock
-                .Setup(o => o.Value)
-                .Returns(new DownloaderSettings
-                {
-                    DownloadedFilesOutputPath = @"C:\Exports"
-                });
+            optionsMock.Setup(o => o.Value).Returns(new DownloaderSettings
+            {
+                DownloadedFilesOutputPath = @"C:\Exports",
+            });
 
             sut = new MarkdownReportService(logger, optionsMock.Object);
         }
@@ -42,8 +40,7 @@ namespace Downloader.Tests.Service
             var act = () => sut.GenerateReport(targets!);
 
             // Assert
-            act.Should().Throw<ArgumentNullException>()
-                .WithParameterName("targets");
+            act.Should().Throw<ArgumentNullException>().WithParameterName("targets");
         }
 
         [Test]
@@ -52,33 +49,17 @@ namespace Downloader.Tests.Service
             // Arrange
             var targets = new List<IDownloadTarget>
             {
-                CreateTarget(
-                    downloadedUsing: DownloadedUsing.PRIMARY,
-                    outputFileName: "A",
-                    fullOutputFileName: @"C:\Exports\a.txt",
-                    primaryLink: "https://primary/a",
-                    secondaryLink: null,
-                    timeToDownload: TimeSpan.FromMilliseconds(150)),
+                CreateTarget(DownloadedUsing.PRIMARY, "A", @"C:\Exports\a.txt", "https://primary/a", null,
+                    TimeSpan.FromMilliseconds(150)),
 
-                CreateTarget(
-                    downloadedUsing: DownloadedUsing.SECONDARY,
-                    outputFileName: "B",
-                    fullOutputFileName: @"C:\Exports\b.txt",
-                    primaryLink: null,
-                    secondaryLink: "https://secondary/b",
-                    timeToDownload: TimeSpan.FromMilliseconds(250)),
+                CreateTarget(DownloadedUsing.SECONDARY, "B", @"C:\Exports\b.txt", null, "https://secondary/b",
+                    TimeSpan.FromMilliseconds(250)),
 
-                CreateTarget(
-                    downloadedUsing: DownloadedUsing.NONE,
-                    outputFileName: "NoneFile",
-                    fullOutputFileName: null,
-                    primaryLink: null,
-                    secondaryLink: null,
-                    timeToDownload: null),
+                CreateTarget(DownloadedUsing.NONE, "NoneFile", null, null, null, null),
             };
 
             // Act
-            var report = sut.GenerateReport(targets);
+            string report = sut.GenerateReport(targets);
 
             // Assert
             report.Should().Contain("# Download Report");
@@ -96,16 +77,11 @@ namespace Downloader.Tests.Service
         public void GenerateReport_PrimaryTarget_UsesPrimaryLink_FileNameAndMilliseconds()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "MyOut",
-                fullOutputFileName: @"C:\Exports\file1.zip",
-                primaryLink: "https://primary/link",
-                secondaryLink: "https://secondary/link-should-not-be-used",
-                timeToDownload: TimeSpan.FromMilliseconds(1234));
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "MyOut", @"C:\Exports\file1.zip",
+                "https://primary/link", "https://secondary/link-should-not-be-used", TimeSpan.FromMilliseconds(1234));
 
             // Act
-            var report = sut.GenerateReport(new List<IDownloadTarget> { target });
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
 
             // Assert
             report.Should().Contain("Downloaded using Primary");
@@ -119,16 +95,11 @@ namespace Downloader.Tests.Service
         public void GenerateReport_SecondaryTarget_UsesSecondaryLink_FileNameAndMilliseconds()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.SECONDARY,
-                outputFileName: "MyOut",
-                fullOutputFileName: @"C:\Exports\file2.zip",
-                primaryLink: "https://primary/link-should-not-be-used",
-                secondaryLink: "https://secondary/link",
-                timeToDownload: TimeSpan.FromMilliseconds(777));
+            IDownloadTarget target = CreateTarget(DownloadedUsing.SECONDARY, "MyOut", @"C:\Exports\file2.zip",
+                "https://primary/link-should-not-be-used", "https://secondary/link", TimeSpan.FromMilliseconds(777));
 
             // Act
-            var report = sut.GenerateReport(new List<IDownloadTarget> { target });
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
 
             // Assert
             report.Should().Contain("Downloaded using Secondary");
@@ -144,16 +115,11 @@ namespace Downloader.Tests.Service
         public void GenerateReport_WhenLinkMissing_UsesMissingLinkPlaceholder(string? missingLink)
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "Out",
-                fullOutputFileName: @"C:\Exports\file3.zip",
-                primaryLink: missingLink,
-                secondaryLink: null,
-                timeToDownload: TimeSpan.FromMilliseconds(10));
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "Out", @"C:\Exports\file3.zip", missingLink,
+                null, TimeSpan.FromMilliseconds(10));
 
             // Act
-            var report = sut.GenerateReport(new List<IDownloadTarget> { target });
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
 
             // Assert
             report.Should().Contain("<missing link>");
@@ -164,16 +130,11 @@ namespace Downloader.Tests.Service
         public void GenerateReport_WhenTimeToDownloadMissing_UsesUnknown()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "Out",
-                fullOutputFileName: @"C:\Exports\file4.zip",
-                primaryLink: "https://primary/link",
-                secondaryLink: null,
-                timeToDownload: null);
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "Out", @"C:\Exports\file4.zip",
+                "https://primary/link", null, null);
 
             // Act
-            var report = sut.GenerateReport(new List<IDownloadTarget> { target });
+            string report = sut.GenerateReport(new List<IDownloadTarget> {target,});
 
             // Assert
             report.Should().Contain("unknown");
@@ -185,19 +146,15 @@ namespace Downloader.Tests.Service
         public void GetOutputFileExtension_ReturnsMd()
         {
             // Arrange / Act
-            var ext = sut.GetOutputFileExtension();
+            string ext = sut.GetOutputFileExtension();
 
             // Assert
             ext.Should().Be(".md");
         }
 
         private static IDownloadTarget CreateTarget(
-            DownloadedUsing downloadedUsing,
-            string outputFileName,
-            string? fullOutputFileName,
-            string? primaryLink,
-            string? secondaryLink,
-            TimeSpan? timeToDownload)
+            DownloadedUsing downloadedUsing, string outputFileName, string? fullOutputFileName, string? primaryLink,
+            string? secondaryLink, TimeSpan? timeToDownload)
         {
             var mock = new Mock<IDownloadTarget>();
 

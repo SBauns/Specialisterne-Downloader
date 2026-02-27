@@ -20,14 +20,14 @@ namespace Downloader.Tests.Service
         {
             // Arrange
             var link = "https://example.com/file.bin";
-            var payload = new byte[] { 1, 2, 3, 4, 5 };
+            var payload = new byte[] {1, 2, 3, 4, 5,};
 
-            var handlerMock = CreateHandlerReturning(HttpStatusCode.OK, payload, out var capture);
+            var handlerMock = CreateHandlerReturning(HttpStatusCode.OK, payload, out RequestCapture capture);
             using var httpClient = new HttpClient(handlerMock.Object);
             var sut = new HttpFileDownloaderService(httpClient);
 
             // Act
-            var (stream, elapsed) = await sut.DownloadOnce(link);
+            (Stream stream, TimeSpan elapsed) = await sut.DownloadOnce(link);
 
             // Assert
             capture.Request.Should().NotBeNull();
@@ -49,7 +49,8 @@ namespace Downloader.Tests.Service
             // Arrange
             var link = "https://example.com/missing";
 
-            var handlerMock = CreateHandlerReturning(HttpStatusCode.NotFound, Array.Empty<byte>(), out _);
+            var handlerMock =
+                CreateHandlerReturning(HttpStatusCode.NotFound, Array.Empty<byte>(), out RequestCapture _);
             using var httpClient = new HttpClient(handlerMock.Object);
             var sut = new HttpFileDownloaderService(httpClient);
 
@@ -68,17 +69,14 @@ namespace Downloader.Tests.Service
 
             var handlerMock = new Mock<HttpMessageHandler>();
             handlerMock.Protected()
-                .Setup<Task<HttpResponseMessage>>(
-                    "SendAsync",
-                    ItExpr.IsAny<HttpRequestMessage>(),
-                    ItExpr.IsAny<CancellationToken>())
-                .Returns<HttpRequestMessage, CancellationToken>((_, ct) =>
+                .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
+                    ItExpr.IsAny<CancellationToken>()).Returns<HttpRequestMessage, CancellationToken>((_, ct) =>
                 {
                     ct.ThrowIfCancellationRequested();
 
                     return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                     {
-                        Content = new ByteArrayContent(new byte[] { 1 })
+                        Content = new ByteArrayContent(new byte[] {1,}),
                     });
                 });
 
@@ -101,25 +99,18 @@ namespace Downloader.Tests.Service
         }
 
         private static Mock<HttpMessageHandler> CreateHandlerReturning(
-            HttpStatusCode statusCode,
-            byte[] contentBytes,
-            out RequestCapture capture)
+            HttpStatusCode statusCode, byte[] contentBytes, out RequestCapture capture)
         {
             var captureLocal = new RequestCapture();
             var handlerMock = new Mock<HttpMessageHandler>();
 
             handlerMock.Protected()
-                .Setup<Task<HttpResponseMessage>>(
-                    "SendAsync",
-                    ItExpr.IsAny<HttpRequestMessage>(),
+                .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
                     ItExpr.IsAny<CancellationToken>())
-                .Callback<HttpRequestMessage, CancellationToken>((req, _) =>
-                {
-                    captureLocal.Request = req;
-                })
+                .Callback<HttpRequestMessage, CancellationToken>((req, _) => { captureLocal.Request = req; })
                 .ReturnsAsync(() => new HttpResponseMessage(statusCode)
                 {
-                    Content = new ByteArrayContent(contentBytes)
+                    Content = new ByteArrayContent(contentBytes),
                 });
 
             capture = captureLocal;

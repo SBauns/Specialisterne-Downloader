@@ -36,11 +36,9 @@ namespace Downloader.Tests.Service
         public async Task InitiateWorkflow_WhenNoTargets_ExitsWithoutReportAndWithoutDownloads()
         {
             // Arrange
-            fileServiceMock
-                .Setup(fs => fs.LoadTargetsFromInput())
-                .ReturnsAsync(new List<IDownloadTarget>());
+            fileServiceMock.Setup(fs => fs.LoadTargetsFromInput()).ReturnsAsync(new List<IDownloadTarget>());
 
-            var sut = CreateSut(maxConcurrentDownloads: 2);
+            OrchestratorService sut = CreateSut(2);
 
             // Act
             await sut.InitiateWorkflow();
@@ -55,14 +53,12 @@ namespace Downloader.Tests.Service
         public async Task InitiateWorkflow_WhenOnlyInvalidTargets_GeneratesAndExportsReport_WithoutDownloading()
         {
             // Arrange
-            var invalidTargets = GivenInvalidTargets(
-                ("B", null, null),
-                ("A", "   ", "  "));
+            var invalidTargets = GivenInvalidTargets(("B", null, null), ("A", "   ", "  "));
 
             GivenInputTargets(invalidTargets);
-            GivenReportOutputs(report: "REPORT", extension: ".md");
+            GivenReportOutputs("REPORT", ".md");
 
-            var sut = CreateSut(maxConcurrentDownloads: 2);
+            OrchestratorService sut = CreateSut(2);
 
             // Act
             await sut.InitiateWorkflow();
@@ -70,24 +66,24 @@ namespace Downloader.Tests.Service
             // Assert
             ThenNoDownloadsWereStarted();
             ThenReportWasGeneratedOnce();
-            ThenReportWasExported(content: "REPORT", extension: ".md");
+            ThenReportWasExported("REPORT", ".md");
         }
 
         [Test]
         public async Task InitiateWorkflow_WhenValidAndInvalidTargets_DownloadsValid_MergesSortsAndExportsReport()
         {
             // Arrange
-            var tB = GivenTarget("b", primary: "https://primary/b", secondary: null);
-            var tA = GivenTarget("A", primary: null, secondary: "https://secondary/a");
-            var tC = GivenTarget("c", primary: "   ", secondary: null);
+            IDownloadTarget tB = GivenTarget("b", "https://primary/b", null);
+            IDownloadTarget tA = GivenTarget("A", null, "https://secondary/a");
+            IDownloadTarget tC = GivenTarget("c", "   ", null);
 
-            var inputTargets = new List<IDownloadTarget> { tB, tC, tA };
+            var inputTargets = new List<IDownloadTarget> {tB, tC, tA,};
 
             GivenInputTargets(inputTargets);
             GivenDownloadServiceReturnsSameTarget();
-            var capture = GivenReportOutputsAndCaptureTargets(report: "REPORT", extension: ".md");
+            ReportTargetsCapture capture = GivenReportOutputsAndCaptureTargets("REPORT", ".md");
 
-            var sut = CreateSut(maxConcurrentDownloads: 5);
+            OrchestratorService sut = CreateSut(5);
 
             // Act
             await sut.InitiateWorkflow();
@@ -97,7 +93,7 @@ namespace Downloader.Tests.Service
             ThenTargetWasDownloaded(tB);
             ThenTargetWasNotDownloaded(tC);
 
-            ThenReportWasExported(content: "REPORT", extension: ".md");
+            ThenReportWasExported("REPORT", ".md");
 
             // Merge + sort by OutputFileName (case-insensitive): A, b, c
             capture.Value.Should().NotBeNull();
@@ -108,33 +104,33 @@ namespace Downloader.Tests.Service
         public async Task InitiateWorkflow_RespectsMaxConcurrentDownloads()
         {
             // Arrange
-            var t1 = GivenTarget("T1", primary: "https://x/1", secondary: null);
-            var t2 = GivenTarget("T2", primary: "https://x/2", secondary: null);
-            var t3 = GivenTarget("T3", primary: "https://x/3", secondary: null);
+            IDownloadTarget t1 = GivenTarget("T1", "https://x/1", null);
+            IDownloadTarget t2 = GivenTarget("T2", "https://x/2", null);
+            IDownloadTarget t3 = GivenTarget("T3", "https://x/3", null);
 
-            GivenInputTargets(new List<IDownloadTarget> { t1, t2, t3 });
-            GivenReportOutputs(report: "REPORT", extension: ".md");
+            GivenInputTargets(new List<IDownloadTarget> {t1, t2, t3,});
+            GivenReportOutputs("REPORT", ".md");
 
-            var limiter = GivenConcurrencyControlledDownloads(t1, t2, t3);
+            ConcurrencyLimiter limiter = GivenConcurrencyControlledDownloads(t1, t2, t3);
 
-            var sut = CreateSut(maxConcurrentDownloads: 2);
+            OrchestratorService sut = CreateSut(2);
 
             // Act
-            var workflowTask = sut.InitiateWorkflow();
+            Task workflowTask = sut.InitiateWorkflow();
 
             // Assert
-            await limiter.ThenWaitForInitialStarts(expectedStarted: 2);
+            await limiter.ThenWaitForInitialStarts(2);
 
             limiter.Complete(t1);
 
-            await limiter.ThenWaitForInitialStarts(expectedStarted: 3);
+            await limiter.ThenWaitForInitialStarts(3);
 
             limiter.Complete(t2);
             limiter.Complete(t3);
 
             await workflowTask;
 
-            ThenReportWasExported(content: "REPORT", extension: ".md");
+            ThenReportWasExported("REPORT", ".md");
         }
 
         #region Helpers
@@ -143,15 +139,11 @@ namespace Downloader.Tests.Service
         {
             var options = Options.Create(new DownloaderSettings
             {
-                MaxConcurrentDownloads = maxConcurrentDownloads
+                MaxConcurrentDownloads = maxConcurrentDownloads,
             });
 
-            return new OrchestratorService(
-                logger,
-                fileServiceMock.Object,
-                downloadServiceMock.Object,
-                reportServiceMock.Object,
-                options);
+            return new OrchestratorService(logger, fileServiceMock.Object, downloadServiceMock.Object,
+                reportServiceMock.Object, options);
         }
 
         private static IDownloadTarget CreateTarget(string outputFileName, string? primaryLink, string? secondaryLink)
@@ -165,13 +157,14 @@ namespace Downloader.Tests.Service
 
         private void GivenInputTargets(IList<IDownloadTarget> targets)
         {
-            fileServiceMock
-                .Setup(fs => fs.LoadTargetsFromInput())
-                .ReturnsAsync(targets);
+            fileServiceMock.Setup(fs => fs.LoadTargetsFromInput()).ReturnsAsync(targets);
         }
 
-        private static IList<IDownloadTarget> GivenInvalidTargets(params (string name, string? primary, string? secondary)[] specs)
-            => specs.Select(s => GivenTarget(s.name, s.primary, s.secondary)).ToList();
+        private static IList<IDownloadTarget> GivenInvalidTargets(
+            params (string name, string? primary, string? secondary)[] specs)
+        {
+            return specs.Select(s => GivenTarget(s.name, s.primary, s.secondary)).ToList();
+        }
 
         private static IDownloadTarget GivenTarget(string outputFileName, string? primary, string? secondary)
         {
@@ -207,25 +200,34 @@ namespace Downloader.Tests.Service
 
         private void GivenDownloadServiceReturnsSameTarget()
         {
-            downloadServiceMock
-                .Setup(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()))
+            downloadServiceMock.Setup(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()))
                 .Returns<IDownloadTarget>(t => Task.FromResult(t));
         }
 
         private void ThenNoDownloadsWereStarted()
-            => downloadServiceMock.Verify(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()), Times.Never);
+        {
+            downloadServiceMock.Verify(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()), Times.Never);
+        }
 
         private void ThenReportWasGeneratedOnce()
-            => reportServiceMock.Verify(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>()), Times.Once);
+        {
+            reportServiceMock.Verify(rs => rs.GenerateReport(It.IsAny<IList<IDownloadTarget>>()), Times.Once);
+        }
 
         private void ThenReportWasExported(string content, string extension)
-            => fileServiceMock.Verify(fs => fs.ExportReport(content, extension), Times.Once);
+        {
+            fileServiceMock.Verify(fs => fs.ExportReport(content, extension), Times.Once);
+        }
 
         private void ThenTargetWasDownloaded(IDownloadTarget target)
-            => downloadServiceMock.Verify(ds => ds.DownloadContent(target), Times.Once);
+        {
+            downloadServiceMock.Verify(ds => ds.DownloadContent(target), Times.Once);
+        }
 
         private void ThenTargetWasNotDownloaded(IDownloadTarget target)
-            => downloadServiceMock.Verify(ds => ds.DownloadContent(target), Times.Never);
+        {
+            downloadServiceMock.Verify(ds => ds.DownloadContent(target), Times.Never);
+        }
 
         // ---- Concurrency helper ----
 
@@ -233,8 +235,7 @@ namespace Downloader.Tests.Service
         {
             var limiter = new ConcurrencyLimiter(targets);
 
-            downloadServiceMock
-                .Setup(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()))
+            downloadServiceMock.Setup(ds => ds.DownloadContent(It.IsAny<IDownloadTarget>()))
                 .Returns<IDownloadTarget>(target =>
                 {
                     limiter.MarkStarted();
@@ -251,29 +252,36 @@ namespace Downloader.Tests.Service
 
             public ConcurrencyLimiter(IEnumerable<IDownloadTarget> targets)
             {
-                completions = targets.ToDictionary(
-                    t => t,
+                completions = targets.ToDictionary(t => t,
                     _ => new TaskCompletionSource<IDownloadTarget>(TaskCreationOptions.RunContinuationsAsynchronously));
             }
 
-            public void MarkStarted() => Interlocked.Increment(ref startedCount);
+            public void MarkStarted()
+            {
+                Interlocked.Increment(ref startedCount);
+            }
 
             public Task<IDownloadTarget> GetTaskFor(IDownloadTarget target)
-                => completions[target].Task;
+            {
+                return completions[target].Task;
+            }
 
             public void Complete(IDownloadTarget target)
-                => completions[target].SetResult(target);
+            {
+                completions[target].SetResult(target);
+            }
 
             public async Task ThenWaitForInitialStarts(int expectedStarted)
             {
                 // Small polling loop is more robust than a single delay.
                 // Keeps the test stable if the runner is fast/slow.
-                var timeout = DateTime.UtcNow.AddSeconds(3);
+                DateTime timeout = DateTime.UtcNow.AddSeconds(3);
 
                 while (Volatile.Read(ref startedCount) < expectedStarted)
                 {
                     if (DateTime.UtcNow > timeout)
-                        throw new TimeoutException($"Timed out waiting for startedCount to reach {expectedStarted}. Current: {startedCount}");
+                        throw new TimeoutException(
+                            $"Timed out waiting for startedCount to reach {expectedStarted}. Current: {startedCount}");
 
                     await Task.Delay(20);
                 }
@@ -283,6 +291,5 @@ namespace Downloader.Tests.Service
         }
 
         #endregion
-
     }
 }

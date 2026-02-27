@@ -19,7 +19,6 @@ namespace Downloader.Executor.Startup
         /// <inheritdoc />
         public virtual void ConfigureServices(HostBuilderContext hostBuilderContext, IServiceCollection services)
         {
-
         }
 
         protected void AddModule(IStartupModule module)
@@ -33,9 +32,7 @@ namespace Downloader.Executor.Startup
 
             ConfigureServices(hostBuilderContext, services);
             foreach (IStartupModule module in _modules)
-            {
                 module.ConfigureServices(hostBuilderContext, Services);
-            }
 
             ServiceProvider = Services.BuildServiceProvider();
         }

@@ -30,7 +30,8 @@ namespace Downloader.Tests.Service
             logger = Mock.Of<ILogger<LocalDriveFileService>>();
             inputReaderMock = new Mock<IInputReaderService>();
 
-            tempRoot = Path.Combine(TestContext.CurrentContext.WorkDirectory, "LocalDriveFileServiceTests", Guid.NewGuid().ToString("N"));
+            tempRoot = Path.Combine(TestContext.CurrentContext.WorkDirectory, "LocalDriveFileServiceTests",
+                Guid.NewGuid().ToString("N"));
             downloadsDir = Path.Combine(tempRoot, "downloads");
             reportsDir = Path.Combine(tempRoot, "reports");
             Directory.CreateDirectory(tempRoot);
@@ -55,7 +56,7 @@ namespace Downloader.Tests.Service
             try
             {
                 if (Directory.Exists(tempRoot))
-                    Directory.Delete(tempRoot, recursive: true);
+                    Directory.Delete(tempRoot, true);
             }
             catch
             {
@@ -71,13 +72,11 @@ namespace Downloader.Tests.Service
             // Arrange
             var expected = new List<IDownloadTarget>
             {
-                CreateTarget(downloadedUsing: DownloadedUsing.PRIMARY, outputFileName: "A", primaryLink: "p", secondaryLink: "s"),
-                CreateTarget(downloadedUsing: DownloadedUsing.SECONDARY, outputFileName: "B", primaryLink: "p2", secondaryLink: "s2"),
+                CreateTarget(DownloadedUsing.PRIMARY, "A", "p", "s"),
+                CreateTarget(DownloadedUsing.SECONDARY, "B", "p2", "s2"),
             };
 
-            inputReaderMock
-                .Setup(r => r.LoadTargets(settings.FilesToDownloadExcelInput))
-                .ReturnsAsync(expected);
+            inputReaderMock.Setup(r => r.LoadTargets(settings.FilesToDownloadExcelInput)).ReturnsAsync(expected);
 
             // Act
             var result = await sut.LoadTargetsFromInput();
@@ -99,52 +98,49 @@ namespace Downloader.Tests.Service
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
 
             // Act
-            Func<Task> act = async () => await sut.ExportDownloadedFile(target, stream);
+            var act = async () => await sut.ExportDownloadedFile(target, stream);
 
             // Assert
-            act.Should().ThrowAsync<ArgumentNullException>()
-               .WithParameterName("target");
+            act.Should().ThrowAsync<ArgumentNullException>().WithParameterName("target");
         }
 
         [Test]
         public void ExportDownloadedFile_WhenFileNameMissing_ThrowsArgumentException()
         {
             // Arrange
-            var target = CreateTarget(downloadedUsing: DownloadedUsing.PRIMARY, outputFileName: "  ", primaryLink: "https://x/a.pdf");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "  ", "https://x/a.pdf");
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
 
             // Act
-            Func<Task> act = async () => await sut.ExportDownloadedFile(target, stream);
+            var act = async () => await sut.ExportDownloadedFile(target, stream);
 
             // Assert
-            act.Should().ThrowAsync<ArgumentException>()
-               .WithParameterName("fileName");
+            act.Should().ThrowAsync<ArgumentException>().WithParameterName("fileName");
         }
 
         [Test]
         public void ExportDownloadedFile_WhenStreamIsNull_ThrowsArgumentNullException()
         {
             // Arrange
-            var target = CreateTarget(downloadedUsing: DownloadedUsing.PRIMARY, outputFileName: "A", primaryLink: "https://x/a.pdf");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "A", "https://x/a.pdf");
             Stream stream = null!;
 
             // Act
-            Func<Task> act = async () => await sut.ExportDownloadedFile(target, stream);
+            var act = async () => await sut.ExportDownloadedFile(target, stream);
 
             // Assert
-            act.Should().ThrowAsync<ArgumentNullException>()
-               .WithParameterName("fileStream");
+            act.Should().ThrowAsync<ArgumentNullException>().WithParameterName("fileStream");
         }
 
         [Test]
         public void ExportDownloadedFile_WhenDownloadedUsingNone_ThrowsInvalidOperationException()
         {
             // Arrange
-            var target = CreateTarget(downloadedUsing: DownloadedUsing.NONE, outputFileName: "A", primaryLink: "https://x/a.pdf");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.NONE, "A", "https://x/a.pdf");
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("hello"));
 
             // Act
-            Func<Task> act = async () => await sut.ExportDownloadedFile(target, stream);
+            var act = async () => await sut.ExportDownloadedFile(target, stream);
 
             // Assert
             act.Should().ThrowAsync<InvalidOperationException>();
@@ -154,12 +150,10 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_PrimaryLink_WithNormalExtension_WritesFileAndSetsFullOutputFileName()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "BR50092",
-                primaryLink: "https://example.com/files/report.pdf");
+            IDownloadTarget target = CreateTarget(
+                DownloadedUsing.PRIMARY, "BR50092", "https://example.com/files/report.pdf");
 
-            var bytes = Encoding.UTF8.GetBytes("content-123");
+            byte[] bytes = Encoding.UTF8.GetBytes("content-123");
             using var stream = new MemoryStream(bytes);
 
             // Act
@@ -172,7 +166,7 @@ namespace Downloader.Tests.Service
             target.FullOutputFileName.Should().EndWith(Path.Combine("downloads", "BR50092.pdf"));
 
             File.Exists(target.FullOutputFileName).Should().BeTrue();
-            var written = await File.ReadAllBytesAsync(target.FullOutputFileName);
+            byte[] written = await File.ReadAllBytesAsync(target.FullOutputFileName);
             written.Should().Equal(bytes);
         }
 
@@ -180,12 +174,10 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_ResetsStreamPosition_WhenNotZero()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "File",
-                primaryLink: "https://example.com/files/data.txt");
+            IDownloadTarget target = CreateTarget(
+                DownloadedUsing.PRIMARY, "File", "https://example.com/files/data.txt");
 
-            var bytes = Encoding.UTF8.GetBytes("abcdef");
+            byte[] bytes = Encoding.UTF8.GetBytes("abcdef");
             using var stream = new MemoryStream(bytes);
 
             // Move position away from 0
@@ -195,7 +187,7 @@ namespace Downloader.Tests.Service
             await sut.ExportDownloadedFile(target, stream);
 
             // Assert
-            var written = await File.ReadAllBytesAsync(target.FullOutputFileName!);
+            byte[] written = await File.ReadAllBytesAsync(target.FullOutputFileName!);
             written.Should().Equal(bytes);
         }
 
@@ -203,11 +195,8 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_SecondaryLink_UsesSecondaryLinkForExtension()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.SECONDARY,
-                outputFileName: "X",
-                primaryLink: "https://example.com/primary/wrong.docx",
-                secondaryLink: "https://example.com/secondary/right.xlsx");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.SECONDARY, "X",
+                "https://example.com/primary/wrong.docx", "https://example.com/secondary/right.xlsx");
 
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("hi"));
 
@@ -222,10 +211,8 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_HandlesQueryFragmentAndHtmlEntities_WhenResolvingExtension()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "R",
-                primaryLink: "https://example.com/report.pdf?la=en&amp;utm=abc#zoom=50");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "R",
+                "https://example.com/report.pdf?la=en&amp;utm=abc#zoom=50");
 
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("data"));
 
@@ -240,10 +227,8 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_WrapperExtension_RecoversPreviousExtension()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "Report_2017",
-                primaryLink: "https://example.com/Report_2017.pdf.aspx");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "Report_2017",
+                "https://example.com/Report_2017.pdf.aspx");
 
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("data"));
 
@@ -258,10 +243,8 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_CompressionExtension_BuildsDoubleExtensionWhenPossible()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "archive",
-                primaryLink: "https://example.com/archive.tar.gz");
+            IDownloadTarget target = CreateTarget(
+                DownloadedUsing.PRIMARY, "archive", "https://example.com/archive.tar.gz");
 
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("data"));
 
@@ -276,10 +259,7 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_CompressionExtension_UsesCompressionOnlyWhenNoPreviousExtension()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "compressed",
-                primaryLink: "https://example.com/file.gz");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "compressed", "https://example.com/file.gz");
 
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("data"));
 
@@ -294,10 +274,7 @@ namespace Downloader.Tests.Service
         public async Task ExportDownloadedFile_NoExtensionInLink_WritesWithoutAppendingExtension()
         {
             // Arrange
-            var target = CreateTarget(
-                downloadedUsing: DownloadedUsing.PRIMARY,
-                outputFileName: "NoExt",
-                primaryLink: "https://example.com/download");
+            IDownloadTarget target = CreateTarget(DownloadedUsing.PRIMARY, "NoExt", "https://example.com/download");
 
             using var stream = new MemoryStream(Encoding.UTF8.GetBytes("data"));
 
@@ -319,11 +296,10 @@ namespace Downloader.Tests.Service
             var content = "   ";
 
             // Act
-            Func<Task> act = async () => await sut.ExportReport(content, "md");
+            var act = async () => await sut.ExportReport(content, "md");
 
             // Assert
-            act.Should().ThrowAsync<ArgumentException>()
-               .WithParameterName("content");
+            act.Should().ThrowAsync<ArgumentException>().WithParameterName("content");
         }
 
         [Test]
@@ -333,11 +309,10 @@ namespace Downloader.Tests.Service
             var content = "hello";
 
             // Act
-            Func<Task> act = async () => await sut.ExportReport(content, "   ");
+            var act = async () => await sut.ExportReport(content, "   ");
 
             // Assert
-            act.Should().ThrowAsync<ArgumentException>()
-               .WithParameterName("fileExtension");
+            act.Should().ThrowAsync<ArgumentException>().WithParameterName("fileExtension");
         }
 
         [Test]
@@ -348,11 +323,10 @@ namespace Downloader.Tests.Service
             sut = new LocalDriveFileService(logger, inputReaderMock.Object, Options.Create(settings));
 
             // Act
-            Func<Task> act = async () => await sut.ExportReport("hello", "md");
+            var act = async () => await sut.ExportReport("hello", "md");
 
             // Assert
-            act.Should().ThrowAsync<InvalidOperationException>()
-               .WithMessage("*ReportsOutputPath*");
+            act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*ReportsOutputPath*");
         }
 
         [Test]
@@ -368,10 +342,10 @@ namespace Downloader.Tests.Service
             // Assert
             Directory.Exists(reportsDir).Should().BeTrue();
 
-            var reportFiles = Directory.GetFiles(reportsDir, "report-*.md");
+            string[] reportFiles = Directory.GetFiles(reportsDir, "report-*.md");
             reportFiles.Should().HaveCount(1);
 
-            var written = await File.ReadAllTextAsync(reportFiles.Single());
+            string written = await File.ReadAllTextAsync(reportFiles.Single());
             written.Should().Be(content);
         }
 
@@ -380,9 +354,7 @@ namespace Downloader.Tests.Service
         #region Helpers
 
         private static IDownloadTarget CreateTarget(
-            DownloadedUsing downloadedUsing,
-            string outputFileName,
-            string? primaryLink = null,
+            DownloadedUsing downloadedUsing, string outputFileName, string? primaryLink = null,
             string? secondaryLink = null)
         {
             var mock = new Mock<IDownloadTarget>();
@@ -393,7 +365,7 @@ namespace Downloader.Tests.Service
             mock.SetupGet(x => x.SecondaryLink).Returns(secondaryLink);
 
             // service sets this property
-            mock.SetupProperty(x => x.FullOutputFileName, (string?)null);
+            mock.SetupProperty(x => x.FullOutputFileName, (string?) null);
 
             return mock.Object;
         }

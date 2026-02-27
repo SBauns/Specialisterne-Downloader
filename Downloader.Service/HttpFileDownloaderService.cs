@@ -16,15 +16,16 @@ namespace Downloader.Service
         {
             var sw = Stopwatch.StartNew();
 
-            using var response = await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead, ct);
+            using HttpResponseMessage response =
+                await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
             // Buffer fully so the timing reflects the full download of the attempt.
-            var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+            byte[] bytes = await response.Content.ReadAsByteArrayAsync(ct);
 
             sw.Stop();
 
-            var ms = new MemoryStream(bytes, writable: false);
+            var ms = new MemoryStream(bytes, false);
             ms.Position = 0;
 
             return (ms, sw.Elapsed);

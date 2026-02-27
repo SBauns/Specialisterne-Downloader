@@ -15,19 +15,21 @@ namespace Downloader.Service
     {
         private static readonly HashSet<string> WrapperExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".aspx", ".asp", ".php", ".ashx", ".jsp", ".do", ".html", ".htm", ".shtml", ".page"
+            ".aspx", ".asp", ".php", ".ashx", ".jsp", ".do", ".html", ".htm", ".shtml", ".page",
         };
 
         private static readonly HashSet<string> CompressionExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
-            ".gz", ".gzip", ".bz2", ".xz", ".zst"
+            ".gz", ".gzip", ".bz2", ".xz", ".zst",
         };
 
         private readonly ILogger<LocalDriveFileService> logger;
         private readonly IInputReaderService inputReader;
         private readonly IOptions<DownloaderSettings> options;
 
-        public LocalDriveFileService(ILogger<LocalDriveFileService> logger, IInputReaderService inputReader, IOptions<DownloaderSettings> options)
+        public LocalDriveFileService(
+            ILogger<LocalDriveFileService> logger, IInputReaderService inputReader,
+            IOptions<DownloaderSettings> options)
         {
             this.logger = logger;
             this.inputReader = inputReader;
@@ -37,7 +39,7 @@ namespace Downloader.Service
         /// <inheritdoc />
         public async Task<IList<IDownloadTarget>> LoadTargetsFromInput()
         {
-            var inputSourceFile = options.Value.FilesToDownloadExcelInput;
+            string inputSourceFile = options.Value.FilesToDownloadExcelInput;
 
             logger.LogInformation("Loading download targets from input file: {InputFile}", inputSourceFile);
 
@@ -57,7 +59,7 @@ namespace Downloader.Service
             if (target is null)
                 throw new ArgumentNullException(nameof(target));
 
-            var fileName = target.OutputFileName;
+            string fileName = target.OutputFileName;
             if (string.IsNullOrWhiteSpace(fileName))
                 throw new ArgumentException("File name must be provided.", nameof(fileName));
 
@@ -67,9 +69,9 @@ namespace Downloader.Service
             // Scope has already been created during the Download Step.
             //logger.BeginTargetScope(fileName);
 
-            var exportPath = options.Value.DownloadedFilesOutputPath;
+            string exportPath = options.Value.DownloadedFilesOutputPath;
 
-            var downloadSourceLink = GetUsedDownloadLink(target);
+            string? downloadSourceLink = GetUsedDownloadLink(target);
 
             logger.LogInformation("Exporting downloaded file '{FileName}' from source '{SourceLink}'.", fileName,
                 downloadSourceLink);
@@ -77,11 +79,11 @@ namespace Downloader.Service
             Directory.CreateDirectory(exportPath);
             logger.LogDebug("Ensured export directory exists: {ExportPath}", exportPath);
 
-            var extension = GetExtensionFromLink(downloadSourceLink);
+            string extension = GetExtensionFromLink(downloadSourceLink);
             logger.LogDebug("Resolved extension '{Extension}' from source link.", extension);
 
-            var finalFileName = string.IsNullOrEmpty(extension) ? fileName : fileName + extension;
-            var fullPath = Path.Combine(exportPath, finalFileName);
+            string finalFileName = string.IsNullOrEmpty(extension) ? fileName : fileName + extension;
+            string fullPath = Path.Combine(exportPath, finalFileName);
             logger.LogDebug("Resolved output file path: {FullPath}", fullPath);
             target.FullOutputFileName = fullPath;
 
@@ -95,7 +97,7 @@ namespace Downloader.Service
             var sw = Stopwatch.StartNew();
 
             await using var file = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None,
-                bufferSize: 81920, useAsync: true);
+                81920, true);
 
             await fileStream.CopyToAsync(file);
 
@@ -111,14 +113,16 @@ namespace Downloader.Service
             {
                 DownloadedUsing.PRIMARY => target.PrimaryLink,
                 DownloadedUsing.SECONDARY => target.SecondaryLink,
-                _ => throw new InvalidOperationException(
+                var _ => throw new InvalidOperationException(
                     $"{nameof(target)} has marked the file to be downloaded from {nameof(DownloadedUsing.NONE)} which is invalid."),
             };
         }
 
         private string GetExtensionFromLink(string? downloadSourceLink)
         {
-            return !TryGetFilePart(downloadSourceLink, out var filePart) ? string.Empty : ResolveExtensionFromFilePart(filePart);
+            return !TryGetFilePart(downloadSourceLink, out string filePart)
+                ? string.Empty
+                : ResolveExtensionFromFilePart(filePart);
         }
 
         private bool TryGetFilePart(string? downloadSourceLink, out string filePart)
@@ -131,15 +135,13 @@ namespace Downloader.Service
                 return false;
             }
 
-            var normalized = NormalizeLink(downloadSourceLink);
+            string normalized = NormalizeLink(downloadSourceLink);
 
             filePart = ExtractFilePart(normalized);
 
             if (string.IsNullOrEmpty(filePart))
             {
-                logger.LogDebug(
-                    "Could not extract file part from source link: {SourceLink}",
-                    downloadSourceLink);
+                logger.LogDebug("Could not extract file part from source link: {SourceLink}", downloadSourceLink);
 
                 return false;
             }
@@ -149,7 +151,7 @@ namespace Downloader.Service
 
         private string ResolveExtensionFromFilePart(string filePart)
         {
-            var lastExt = Path.GetExtension(filePart);
+            string lastExt = Path.GetExtension(filePart);
 
             if (string.IsNullOrEmpty(lastExt))
             {
@@ -169,26 +171,21 @@ namespace Downloader.Service
 
         private string ResolveWrapperExtension(string filePart, string wrapperExt)
         {
-            var recovered = RecoverExtensionBeforeWrapper(filePart, wrapperExt);
+            string? recovered = RecoverExtensionBeforeWrapper(filePart, wrapperExt);
 
-            logger.LogDebug(
-                "Wrapper extension '{WrapperExt}' detected. Recovered '{RecoveredExt}' from '{FilePart}'.",
-                wrapperExt,
-                recovered ?? "(none)",
-                filePart);
+            logger.LogDebug("Wrapper extension '{WrapperExt}' detected. Recovered '{RecoveredExt}' from '{FilePart}'.",
+                wrapperExt, recovered ?? "(none)", filePart);
 
             return recovered ?? string.Empty;
         }
 
         private string ResolveCompressionExtension(string filePart, string compressionExt)
         {
-            var combined = BuildDoubleExtensionIfPossible(filePart, compressionExt);
+            string combined = BuildDoubleExtensionIfPossible(filePart, compressionExt);
 
             logger.LogDebug(
                 "Compression extension '{CompressionExt}' detected. Using '{CombinedExt}' from '{FilePart}'.",
-                compressionExt,
-                combined,
-                filePart);
+                compressionExt, combined, filePart);
 
             return combined;
         }
@@ -220,56 +217,57 @@ namespace Downloader.Service
         /// </summary>
         private string NormalizeLink(string link)
         {
-            var trimmed = link.Trim();
-            var decoded = WebUtility.HtmlDecode(trimmed);
+            string trimmed = link.Trim();
+            string decoded = WebUtility.HtmlDecode(trimmed);
 
-            var withoutFragment = CutAtFirst(decoded, '#');
-            var withoutQuery = CutAtFirst(withoutFragment, '?');
-            var path = ToPath(withoutQuery);
+            string withoutFragment = CutAtFirst(decoded, '#');
+            string withoutQuery = CutAtFirst(withoutFragment, '?');
+            string path = ToPath(withoutQuery);
 
             if (!string.Equals(link, path, StringComparison.Ordinal))
-            {
                 logger.LogDebug("Normalized source link from '{Original}' to '{Normalized}'.", link, path);
-            }
 
             return path;
         }
 
         private string ToPath(string linkOrPath)
         {
-            if (!Uri.TryCreate(linkOrPath, UriKind.Absolute, out var uri))
+            if (!Uri.TryCreate(linkOrPath, UriKind.Absolute, out Uri? uri))
                 return linkOrPath;
 
             logger.LogDebug("Parsed absolute URI; using AbsolutePath '{AbsolutePath}'.", uri.AbsolutePath);
             return uri.AbsolutePath;
-
         }
 
         private string ExtractFilePart(string path)
         {
-            var normalized = path.Replace('\\', '/');
-            var lastSlash = normalized.LastIndexOf('/');
+            string normalized = path.Replace('\\', '/');
+            int lastSlash = normalized.LastIndexOf('/');
             return lastSlash >= 0 ? normalized[(lastSlash + 1)..] : normalized;
         }
 
         private string CutAtFirst(string input, char delimiter)
         {
-            var idx = input.IndexOf(delimiter);
+            int idx = input.IndexOf(delimiter);
             return idx >= 0 ? input[..idx] : input;
         }
 
         private bool IsWrapperExtension(string extension)
-            => WrapperExtensions.Contains(extension);
+        {
+            return WrapperExtensions.Contains(extension);
+        }
 
         private bool IsCompressionExtension(string extension)
-            => CompressionExtensions.Contains(extension);
+        {
+            return CompressionExtensions.Contains(extension);
+        }
 
         private string BuildDoubleExtensionIfPossible(string filePart, string compressionExt)
         {
-            var withoutCompression = Path.GetFileNameWithoutExtension(filePart);
-            var previousExt = Path.GetExtension(withoutCompression);
+            string withoutCompression = Path.GetFileNameWithoutExtension(filePart);
+            string previousExt = Path.GetExtension(withoutCompression);
 
-            var result = string.IsNullOrEmpty(previousExt) ? compressionExt : previousExt + compressionExt;
+            string result = string.IsNullOrEmpty(previousExt) ? compressionExt : previousExt + compressionExt;
 
             logger.LogDebug(
                 "Double-extension resolution: filePart='{FilePart}', previousExt='{PreviousExt}', compressionExt='{CompressionExt}', result='{Result}'.",
@@ -290,8 +288,8 @@ namespace Downloader.Service
         /// </summary>
         private string? RecoverExtensionBeforeWrapper(string filePart, string wrapperExt)
         {
-            var withoutWrapper = filePart[..^wrapperExt.Length];
-            var previousExt = Path.GetExtension(withoutWrapper);
+            string withoutWrapper = filePart[..^wrapperExt.Length];
+            string previousExt = Path.GetExtension(withoutWrapper);
             return string.IsNullOrEmpty(previousExt) ? null : previousExt;
         }
 
@@ -304,11 +302,11 @@ namespace Downloader.Service
             if (string.IsNullOrWhiteSpace(fileExtension))
                 throw new ArgumentException("File extension cannot be null or empty.", nameof(fileExtension));
 
-            var exportPath = options.Value.ReportsOutputPath;
+            string exportPath = options.Value.ReportsOutputPath;
 
             logger.LogInformation("Starting report export. Extension: {Extension}", fileExtension);
 
-            var fullPath = BuildReportOutputPath(exportPath, fileExtension);
+            string fullPath = BuildReportOutputPath(exportPath, fileExtension);
 
             await WriteReportFile(fullPath, content);
         }
@@ -324,7 +322,7 @@ namespace Downloader.Service
 
             var datePart = DateTime.Now.ToString("yyyyMMdd_HHmmss");
             var fileName = $"report-{datePart}.{fileExtension}";
-            var fullPath = Path.Combine(exportPath, fileName);
+            string fullPath = Path.Combine(exportPath, fileName);
 
             logger.LogDebug("Resolved report file path. FileName: {FileName}, FullPath: {FullPath}", fileName,
                 fullPath);
