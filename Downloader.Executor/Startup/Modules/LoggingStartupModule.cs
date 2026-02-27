@@ -40,6 +40,16 @@ namespace Downloader.Executor.Startup.Modules
                 x.AddSerilog(Log.Logger);
             });
 
+            var todayFileName = $"log-{DateTime.Now:yyyyMMdd}.log";
+            var fullPath = Path.Combine(LogDirectory, todayFileName);
+
+            if (File.Exists(fullPath))
+            {
+                File.AppendAllText(fullPath, Environment.NewLine);
+                File.AppendAllText(fullPath, Environment.NewLine);
+                File.AppendAllText(fullPath, Environment.NewLine);
+            }
+
             var logger = services.BuildServiceProvider().GetService<ILogger<LoggingStartupModule>>();
             logger?.LogDebug("Completed Configuration of Logging Services.");
         }
