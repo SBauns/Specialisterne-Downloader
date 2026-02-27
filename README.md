@@ -1,5 +1,7 @@
 # File Downloader (Downloader.Executor)
 
+***Many parts of the code has been generated with use of ChatGPT***
+
 Console app for downloading files listed in an Excel sheet, with configurable output folders, retries, and concurrency.
 
 > Note: For now the program is run **from source**. A single-file release build is planned later.
@@ -182,3 +184,6 @@ Upper inclusive bound of targets to process.
   - E.g 403, i.e Forbidden, wont change with a retry.
 - Configure `HttpClient` used more precisely.
   - E.g to bypass sites rejecting the request due to suspected crawler / AI activty
+- Include output files size in report.
+- Include total files for each section in report.
+- Add configurable maximum time to download file.
