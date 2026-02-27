@@ -10,5 +10,6 @@ namespace Downloader.Abstraction.Interfaces.Model
         string? SecondaryLink { get; set; }
         DownloadedUsing DownloadedUsing { get; set; }
         TimeSpan? TimeToDownload { get; set; }
+        long OutputFileSize { get; set; }
     }
 }

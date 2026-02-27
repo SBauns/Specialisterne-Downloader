@@ -22,5 +22,8 @@ namespace Downloader.Model
 
         /// <inheritdoc />
         public TimeSpan? TimeToDownload { get; set; }
+
+        /// <inheritdoc />
+        public long OutputFileSize { get; set; }
     }
 }

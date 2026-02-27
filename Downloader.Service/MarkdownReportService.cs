@@ -88,11 +88,14 @@ namespace Downloader.Service
         {
             builder.AddHeader(2, $"Downloaded using {nameof(DownloadedUsing.PRIMARY).ToTitleFromScreamingSnakeCase()}");
 
+            builder.AddParagraph(
+                $"Downloaded files using {nameof(DownloadedUsing.PRIMARY).ToTitleFromScreamingSnakeCase()}: {primary.Count}");
+
             builder.AddUnorderedList(ul =>
             {
                 foreach (IDownloadTarget t in primary)
                 {
-                    string line = FormatSuccessLine(t.PrimaryLink, t.FullOutputFileName!, t.TimeToDownload);
+                    string line = FormatSuccessLine(t.PrimaryLink, t.FullOutputFileName!, t.TimeToDownload, t.OutputFileSize);
 
                     ul.AddTaskListItem(line, true);
                 }
@@ -104,11 +107,14 @@ namespace Downloader.Service
             builder.AddHeader(2,
                 $"Downloaded using {nameof(DownloadedUsing.SECONDARY).ToTitleFromScreamingSnakeCase()}");
 
+            builder.AddParagraph(
+                $"Downloaded files using {nameof(DownloadedUsing.SECONDARY).ToTitleFromScreamingSnakeCase()}: {secondary.Count}");
+
             builder.AddUnorderedList(ul =>
             {
                 foreach (IDownloadTarget t in secondary)
                 {
-                    string line = FormatSuccessLine(t.SecondaryLink, t.FullOutputFileName!, t.TimeToDownload);
+                    string line = FormatSuccessLine(t.SecondaryLink, t.FullOutputFileName!, t.TimeToDownload, t.OutputFileSize);
 
                     ul.AddTaskListItem(line, true);
                 }
@@ -119,6 +125,9 @@ namespace Downloader.Service
         {
             builder.AddHeader(2, "Not downloaded");
 
+            builder.AddParagraph(
+                $"Files not downloaded: {none.Count}");
+
             builder.AddUnorderedList(ul =>
             {
                 foreach (IDownloadTarget t in none)
@@ -126,7 +135,7 @@ namespace Downloader.Service
             });
         }
 
-        private string FormatSuccessLine(string? link, string fullOutputFileName, TimeSpan? timeToDownload)
+        private string FormatSuccessLine(string? link, string fullOutputFileName, TimeSpan? timeToDownload, long fileSizeBytes)
         {
             if (string.IsNullOrWhiteSpace(link))
                 link = "<missing link>";
@@ -134,10 +143,29 @@ namespace Downloader.Service
             string fileName = Path.GetFileName(fullOutputFileName);
 
             double? ms = timeToDownload?.TotalMilliseconds;
-
             string msText = ms is null ? "unknown" : $"{ms.Value:0} ms";
 
-            return $"{msText,8}  {fileName,-12}  {link}";
+            string sizeText = FormatFileSize(fileSizeBytes);
+
+            return $"{msText,14} {sizeText,6} {fileName,-12}  {link}";
+        }
+
+        private string FormatFileSize(long bytes)
+        {
+            const long KB = 1024;
+            const long MB = KB * 1024;
+            const long GB = MB * 1024;
+
+            if (bytes >= GB)
+                return $"{bytes / (double) GB:0}GB";
+
+            if (bytes >= MB)
+                return $"{bytes / (double) MB:0}MB";
+
+            if (bytes >= KB)
+                return $"{bytes / (double) KB:0}KB";
+
+            return $"{bytes}B";
         }
 
         /// <inheritdoc />
