@@ -14,10 +14,12 @@ namespace Downloader.Service
 
         public async Task<(Stream Stream, TimeSpan Elapsed)> DownloadOnce(string link, CancellationToken ct = default)
         {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
             var sw = Stopwatch.StartNew();
 
             using HttpResponseMessage response =
-                await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead, ct);
+                await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
             response.EnsureSuccessStatusCode();
 
             // Buffer fully so the timing reflects the full download of the attempt.
