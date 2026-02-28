@@ -108,9 +108,17 @@ namespace Downloader.Tests.Service
                 .Setup<Task<HttpResponseMessage>>("SendAsync", ItExpr.IsAny<HttpRequestMessage>(),
                     ItExpr.IsAny<CancellationToken>())
                 .Callback<HttpRequestMessage, CancellationToken>((req, _) => { captureLocal.Request = req; })
-                .ReturnsAsync(() => new HttpResponseMessage(statusCode)
+                .ReturnsAsync(() =>
                 {
-                    Content = new ByteArrayContent(contentBytes),
+                    var response = new HttpResponseMessage(statusCode)
+                    {
+                        Content = new ByteArrayContent(contentBytes),
+                    };
+
+                    response.Content.Headers.ContentType =
+                        new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+
+                    return response;
                 });
 
             capture = captureLocal;
