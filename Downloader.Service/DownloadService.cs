@@ -119,7 +119,24 @@ namespace Downloader.Service
             logger.LogDebug("Attempting download ({Attempt}/{Max}) using {LinkLabel} link.", attempt,
                 maxDownloadTries, downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
 
-            (Stream stream, TimeSpan elapsed) = await fileDownloaderService.DownloadOnce(link);
+            const int timeLimitMinutes = 30;
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(timeLimitMinutes));
+
+            Task<(Stream stream, TimeSpan elapsed)> downloadTask =
+                fileDownloaderService.DownloadOnce(link, timeoutCts.Token);
+
+            var completed = await Task.WhenAny(downloadTask, Task.Delay(Timeout.InfiniteTimeSpan, timeoutCts.Token));
+
+            if (completed != downloadTask)
+            {
+                // ensure cancellation requested (in case Delay completed by cancellation)
+                await timeoutCts.CancelAsync();
+                logger.LogWarning("Download with {DownloadedUsing} reached hard limit for time spent", downloadedUsing.ToString().ToTitleFromScreamingSnakeCase());
+                throw new TimeoutException($"Download did not complete within {timeLimitMinutes} minutes. Link: {link}");
+            }
+
+            // propagate any exceptions from DownloadOnce
+            (Stream stream, TimeSpan elapsed) = await downloadTask;
 
             logger.LogInformation(
                 "Download attempt succeeded ({Attempt}/{Max}) using {LinkLabel} link. Elapsed: {Elapsed}", attempt,

@@ -39,7 +39,7 @@ namespace Downloader.Tests.Service
             using var stream = new MemoryStream(new byte[] {1, 2, 3,});
             TimeSpan elapsed = TimeSpan.FromMilliseconds(123);
 
-            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary")).ReturnsAsync((stream, elapsed));
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary", It.IsAny<CancellationToken>())).ReturnsAsync((stream, elapsed));
 
             var options = CreateOptions(3, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
@@ -52,8 +52,8 @@ namespace Downloader.Tests.Service
             target.DownloadedUsing.Should().Be(DownloadedUsing.PRIMARY);
             target.TimeToDownload.Should().Be(elapsed);
 
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Once);
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Never);
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary", It.IsAny<CancellationToken>()), Times.Once);
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary", It.IsAny<CancellationToken>()), Times.Never);
 
             fileServiceMock.Verify(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()), Times.Once);
         }
@@ -68,7 +68,7 @@ namespace Downloader.Tests.Service
             using var stream = new MemoryStream(new byte[] {9,});
             TimeSpan elapsed = TimeSpan.FromMilliseconds(50);
 
-            httpDownloaderMock.Setup(d => d.DownloadOnce("https://secondary")).ReturnsAsync((stream, elapsed));
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://secondary", It.IsAny<CancellationToken>())).ReturnsAsync((stream, elapsed));
 
             var options = CreateOptions(3, 0);
             var sut = new DownloadService(logger, fileServiceMock.Object, httpDownloaderMock.Object, options);
@@ -81,8 +81,8 @@ namespace Downloader.Tests.Service
             target.DownloadedUsing.Should().Be(DownloadedUsing.SECONDARY);
             target.TimeToDownload.Should().Be(elapsed);
 
-            httpDownloaderMock.Verify(d => d.DownloadOnce(It.IsAny<string>()), Times.Once);
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Once);
+            httpDownloaderMock.Verify(d => d.DownloadOnce(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary", It.IsAny<CancellationToken>()), Times.Once);
 
             fileServiceMock.Verify(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()), Times.Once);
         }
@@ -94,13 +94,13 @@ namespace Downloader.Tests.Service
             var targetMock = CreateTarget("https://primary", "https://secondary");
             IDownloadTarget target = targetMock.Object;
 
-            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary"))
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary", It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new HttpRequestException("fail"));
 
             using var secondaryStream = new MemoryStream(new byte[] {7, 7,});
             TimeSpan secondaryElapsed = TimeSpan.FromMilliseconds(222);
 
-            httpDownloaderMock.Setup(d => d.DownloadOnce("https://secondary"))
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://secondary", It.IsAny<CancellationToken>()))
                 .ReturnsAsync((secondaryStream, secondaryElapsed));
 
             var options = CreateOptions(3, 0);
@@ -114,8 +114,8 @@ namespace Downloader.Tests.Service
             target.DownloadedUsing.Should().Be(DownloadedUsing.SECONDARY);
             target.TimeToDownload.Should().Be(secondaryElapsed);
 
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(4));
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Once);
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary", It.IsAny<CancellationToken>()), Times.Exactly(4));
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary", It.IsAny<CancellationToken>()), Times.Once);
 
             fileServiceMock.Verify(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()), Times.Once);
         }
@@ -127,7 +127,7 @@ namespace Downloader.Tests.Service
             var targetMock = CreateTarget("https://primary", "https://secondary");
             IDownloadTarget target = targetMock.Object;
 
-            httpDownloaderMock.Setup(d => d.DownloadOnce(It.IsAny<string>()))
+            httpDownloaderMock.Setup(d => d.DownloadOnce(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .ThrowsAsync(new HttpRequestException("fail"));
 
             var options = CreateOptions(2, 0);
@@ -141,8 +141,8 @@ namespace Downloader.Tests.Service
             target.DownloadedUsing.Should().Be(DownloadedUsing.NONE);
             target.TimeToDownload.Should().BeNull();
 
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary"), Times.Exactly(3));
-            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary"), Times.Exactly(3));
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://primary", It.IsAny<CancellationToken>()), Times.Exactly(3));
+            httpDownloaderMock.Verify(d => d.DownloadOnce("https://secondary", It.IsAny<CancellationToken>()), Times.Exactly(3));
 
             fileServiceMock.Verify(fs => fs.ExportDownloadedFile(It.IsAny<IDownloadTarget>(), It.IsAny<Stream>()),
                 Times.Never);
@@ -156,7 +156,7 @@ namespace Downloader.Tests.Service
             IDownloadTarget target = targetMock.Object;
 
             var disposableStream = new TrackingStream(new byte[] {1, 2, 3,});
-            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary"))
+            httpDownloaderMock.Setup(d => d.DownloadOnce("https://primary", It.IsAny<CancellationToken>()))
                 .ReturnsAsync((disposableStream, TimeSpan.FromMilliseconds(1)));
 
             fileServiceMock.Setup(fs => fs.ExportDownloadedFile(target, It.IsAny<Stream>()))

@@ -15,12 +15,10 @@ namespace Downloader.Service
 
         public async Task<(Stream Stream, TimeSpan Elapsed)> DownloadOnce(string link, CancellationToken ct = default)
         {
-            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromMinutes(30));
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
             var sw = Stopwatch.StartNew();
 
             using HttpResponseMessage response =
-                await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead, linkedCts.Token);
+                await httpClient.GetAsync(link, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
             var contentType = response.Content.Headers.ContentType?.MediaType;
